@@ -251,7 +251,7 @@ try { TOKEN = localStorage.getItem('genebov_token') || ''; } catch (e) {}
 var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEstadoCuenta',
   'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
   'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
-  'guardarConfig','guardarTema','importarFichasZip'];
+  'guardarConfig','guardarTema','importarFichasZip','generarLista'];
 
 function pedir(accion, args) {
   if (!API) {
@@ -1018,6 +1018,7 @@ function vistaCatalogo(m) {
     [sinFicha ? String(sinFicha) : null, 'sin ficha', true]
   ]));
   m.appendChild(tarjetaPDF());
+  m.appendChild(tarjetaLista());
   var cont = el('div');
   cont.style.display = 'flex'; cont.style.flexDirection = 'column'; cont.style.gap = '14px';
   m.appendChild(buscador('Buscar toro…', function () { listaCatalogo(cont); }));
@@ -1163,6 +1164,53 @@ function verPDFCompleto() {
   a.className = 'enlace'; a.href = p.ver; a.target = '_blank'; a.rel = 'noopener';
   a.innerHTML = SVG.doc; a.appendChild(el('span', null, 'Abrirlo en grande'));
   h.sh.appendChild(a);
+}
+
+var LISTA = null;   // la última lista generada en este teléfono
+
+function tarjetaLista() {
+  var card = el('div', 'card pad');
+  card.appendChild(el('p', 'rot', 'Lista de toros al día'));
+  card.appendChild(el('p', 'sub2',
+    'Un documento liviano con los toros que tengas en este momento, por raza y con su código. ' +
+    'Sin las fichas adentro, para mandarlo rápido por WhatsApp.'));
+
+  var b = el('button', 'btn sec', LISTA ? 'Generar otra vez' : 'Generar la lista');
+  b.style.width = '100%';
+  b.onclick = function () {
+    b.disabled = true; b.textContent = 'Armando el documento…';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        LISTA = r;
+        toast('Lista lista: ' + r.toros + ' toros');
+        pintar();
+      })
+      .withFailureHandler(function (e) {
+        b.disabled = false; b.textContent = 'Generar la lista';
+        toast(String(e && e.message ? e.message : e));
+      })
+      .generarLista();
+  };
+  card.appendChild(b);
+
+  if (LISTA && LISTA.ok) {
+    card.appendChild(el('div', 'pdfnom', LISTA.nombre));
+    card.appendChild(el('div', 'sub2',
+      LISTA.fecha + '  ·  ' + LISTA.toros + ' toros  ·  ' + LISTA.razas + ' razas'));
+    var go = el('div', 'go');
+    var dl = document.createElement('a');
+    dl.className = 'btn pri'; dl.href = LISTA.descarga; dl.target = '_blank'; dl.rel = 'noopener';
+    dl.style.textDecoration = 'none'; dl.style.textAlign = 'center';
+    dl.textContent = 'Descargar';
+    go.appendChild(dl);
+    var ver = document.createElement('a');
+    ver.className = 'btn sec'; ver.href = LISTA.ver; ver.target = '_blank'; ver.rel = 'noopener';
+    ver.style.textDecoration = 'none'; ver.style.textAlign = 'center';
+    ver.textContent = 'Ver';
+    go.appendChild(ver);
+    card.appendChild(go);
+  }
+  return card;
 }
 
 function tarjetaPDF() {
