@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Genebov</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14183C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Genebov">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<link rel="icon" href="iconos/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="config.js"></script>
+<style>
+
+/* Paleta del catálogo Genebov: azul de marca, rojo de marca, Poppins. */
+:root{
+  --bg:#F3F4F9; --surface:#FFFFFF; --surface-2:#F7F8FC;
+  --ink:#14183C; --body:#2A2E48; --muted:#6E7385; --line:#E2E4EC;
+  --navy:#14183C; --navy-2:#1D2250; --red:#E1232B; --red-soft:#FDECEC;
+  --ok:#0E7A4F; --ok-soft:#E4F4EC; --warn:#9A5B00; --warn-soft:#FFF3DF; --off:#8A8FA3;
+  --shadow:0 1px 2px rgba(20,24,60,.06), 0 6px 18px rgba(20,24,60,.07);
+  --display:"Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:12px; --nav:62px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-tema="claro"]){
+  --bg:#0A0D22; --surface:#141838; --surface-2:#1A1F42;
+  --ink:#EFF0F7; --body:#D3D6E6; --muted:#9398B4; --line:#262B52;
+  --navy:#0C0F2B; --navy-2:#242952; --red:#F2474E; --red-soft:#3A1418;
+  --ok:#5FD39B; --ok-soft:#10301F; --warn:#F0B35B; --warn-soft:#3A2A10; --off:#6E7395;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.35);
+  color-scheme:dark;
+}}
+:root[data-tema="oscuro"]{
+  --bg:#0A0D22; --surface:#141838; --surface-2:#1A1F42;
+  --ink:#EFF0F7; --body:#D3D6E6; --muted:#9398B4; --line:#262B52;
+  --navy:#0C0F2B; --navy-2:#242952; --red:#F2474E; --red-soft:#3A1418;
+  --ok:#5FD39B; --ok-soft:#10301F; --warn:#F0B35B; --warn-soft:#3A2A10; --off:#6E7395;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0; padding:0}
+body{background:var(--bg); color:var(--body); font-family:var(--display); font-size:15px; line-height:1.5;
+     -webkit-text-size-adjust:100%; padding-bottom:calc(var(--nav) + env(safe-area-inset-bottom,0px))}
+h1,h2,h3{margin:0; color:var(--ink)}
+button,input,select,textarea{font-family:var(--display); font-size:15px}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--red); outline-offset:2px; border-radius:6px}
+.wrap{max-width:720px; margin:0 auto;
+      padding-left:max(14px,env(safe-area-inset-left,0px)); padding-right:max(14px,env(safe-area-inset-right,0px))}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* --------- cabecera --------- */
+.top{position:sticky; top:0; z-index:20; background:var(--navy); border-bottom:3px solid var(--red)}
+.top .wrap{padding-block:12px; display:flex; align-items:center; gap:12px}
+.top img{height:30px; width:auto; display:block}
+.top .sp{flex:1}
+.top .sec{font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:#C3C7DC}
+.recargar{background:transparent; border:0; color:#C3C7DC; padding:6px; line-height:0; border-radius:8px}
+.recargar:hover{background:rgba(255,255,255,.1); color:#fff}
+.recargar svg{width:19px; height:19px}
+.recargar.girando svg{animation:giro 1s linear infinite}
+@keyframes giro{to{transform:rotate(360deg)}}
+
+/* --------- navegación --------- */
+.nav{position:fixed; left:0; right:0; bottom:0; z-index:30; background:var(--surface);
+     border-top:1px solid var(--line); display:flex;
+     padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav button{flex:1; min-width:0; background:transparent; border:0; padding:9px 2px 8px; display:grid; gap:3px;
+            justify-items:center; color:var(--muted); font-size:10px; font-weight:600}
+.nav button span{overflow:hidden; text-overflow:ellipsis; max-width:100%}
+.nav button svg{width:21px; height:21px}
+.nav button.on{color:var(--red)}
+
+/* --------- bloques --------- */
+main{padding-block:16px 24px; display:flex; flex-direction:column; gap:14px}
+.card{background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden}
+.card.pad{padding:15px}
+.tiles{display:flex; gap:10px; flex-wrap:wrap}
+.tile{flex:1 1 86px; background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow); padding:12px 13px}
+.tile b{display:block; font-size:20px; font-weight:700; color:var(--ink); line-height:1.2}
+.tile span{font-size:9.5px; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); white-space:nowrap}
+.tile.alert{background:var(--warn-soft)} .tile.alert b,.tile.alert span{color:var(--warn)}
+.buscar{position:relative}
+.buscar input{width:100%; background:var(--surface); border:1px solid var(--line); border-radius:10px;
+              padding:11px 12px; color:var(--ink)}
+.buscar input:focus{border-color:var(--red); outline:none}
+.hdr{display:flex; align-items:center; gap:8px; padding:10px 13px; background:var(--navy)}
+.hdr h3{color:#fff; font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+        flex:1; min-width:0; overflow-wrap:anywhere}
+.hdr .n{font-size:11px; color:#A9AEC9}
+.fila{display:flex; align-items:center; gap:10px; padding:11px 13px; border-top:1px solid var(--line);
+      background:transparent; border-left:0; border-right:0; border-bottom:0; width:100%; text-align:left; color:inherit}
+.fila:first-child{border-top:0}
+.fila .m{flex:1; min-width:0}
+.fila .t{font-size:15px; font-weight:500; color:var(--ink); overflow-wrap:anywhere}
+.fila .s{font-size:12px; color:var(--muted); margin-top:2px; display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.fila .v{font-size:15px; font-weight:600; color:var(--ink); white-space:nowrap}
+.fila.off{background:var(--surface-2)} .fila.off .t{color:var(--off)}
+.chip{font-size:9.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px;
+      border-radius:999px; white-space:nowrap}
+.chip.rojo{background:var(--red-soft); color:var(--red)}
+.chip.ok{background:var(--ok-soft); color:var(--ok)}
+.chip.warn{background:var(--warn-soft); color:var(--warn)}
+.chip.gris{background:var(--surface-2); color:var(--off); border:1px solid var(--line)}
+.code{font-family:var(--mono); font-size:11px; color:var(--muted)}
+.vacio{padding:22px 14px; text-align:center; color:var(--muted); font-size:13.5px}
+.accion{width:100%; background:var(--surface-2); border:0; border-top:1px solid var(--line);
+        color:var(--red); font-size:13px; font-weight:600; padding:12px}
+.accion:hover{background:var(--red-soft)}
+.btn{border:0; border-radius:10px; padding:12px 16px; font-size:14px; font-weight:600}
+.btn.pri{background:var(--red); color:#fff}
+.btn.sec{background:var(--surface-2); color:var(--body); border:1px solid var(--line)}
+.btn.wa{background:#1F9F4A; color:#fff}
+.btn:disabled{opacity:.55; cursor:default}
+.btns{display:flex; gap:9px; margin-top:16px}
+.btns .btn{flex:1}
+.ic{background:transparent; border:0; padding:7px; border-radius:8px; color:var(--muted); line-height:0}
+.ic:hover{background:var(--surface-2); color:var(--ink)}
+.ic:disabled{opacity:.25}
+.ic svg{width:17px; height:17px}
+.ic.on{color:var(--ink)}
+.hdr .ic{color:#8A90B4} .hdr .ic:hover{background:rgba(255,255,255,.1); color:#fff}
+
+/* --------- hojas y formularios --------- */
+.veil{position:fixed; inset:0; z-index:50; background:rgba(10,13,34,.55); display:grid;
+      place-items:end center; overflow:auto}
+@media (min-width:560px){.veil{place-items:center}}
+.sheet{background:var(--surface); width:100%; max-width:520px; max-height:92vh; overflow:auto;
+       border-radius:16px 16px 0 0;
+       padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+@media (min-width:560px){.sheet{border-radius:16px; padding-bottom:20px}}
+.sheet h2{font-size:19px; font-weight:600; margin-bottom:3px}
+.sheet .sub{font-size:13px; color:var(--muted); margin:0 0 14px}
+.f{margin-bottom:13px}
+.f label{display:block; font-size:10.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+         color:var(--muted); margin-bottom:5px}
+.f input,.f select,.f textarea{width:100%; background:var(--surface-2); border:1px solid var(--line);
+         border-radius:9px; padding:10px; color:var(--ink)}
+.f textarea{min-height:70px; resize:vertical; font-size:14px}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--red); outline:none}
+.f .hint{font-size:12px; color:var(--muted); margin:5px 0 0}
+.f2{display:flex; gap:10px} .f2>*{flex:1; min-width:0}
+.dos{display:flex; gap:9px}
+.dos>*{flex:1; min-width:0}
+.seg{display:flex; gap:8px}
+.seg label{flex:1; display:block; margin:0; text-align:center; background:var(--surface-2);
+  border:1.5px solid var(--line); border-radius:9px; padding:9px 6px; font-size:12.5px; font-weight:600;
+  letter-spacing:0; text-transform:none; color:var(--muted); cursor:pointer; position:relative}
+.seg input{position:absolute; opacity:0; pointer-events:none}
+.seg label:has(input:checked){border-color:var(--red); background:var(--red-soft); color:var(--red)}
+.lista{display:flex; flex-direction:column; gap:7px}
+.item{background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:9px 10px;
+      display:grid; grid-template-columns:1fr 78px auto; gap:7px; align-items:center}
+.item select,.item input{background:var(--surface); border:1px solid var(--line); border-radius:7px;
+      padding:8px; font-size:13.5px; width:100%; color:var(--ink)}
+.monto{font-size:26px; font-weight:700; color:var(--ink); text-align:center; padding:6px 0}
+.foto{width:100%; border-radius:10px; display:block; margin-bottom:10px; max-height:230px; object-fit:contain;
+      background:var(--surface-2)}
+.subir{width:100%; background:var(--surface-2); border:1.5px dashed var(--line); color:var(--red);
+       border-radius:10px; padding:16px; font-size:13.5px; font-weight:600}
+.subir:hover{border-color:var(--red); background:var(--red-soft)}
+.subir:disabled{opacity:.6; color:var(--muted)}
+.estado{font-size:12.5px; color:var(--muted); margin:8px 0 0; min-height:1em}
+.toast{position:fixed; left:50%; transform:translateX(-50%);
+       bottom:calc(var(--nav) + 16px + env(safe-area-inset-bottom,0px)); z-index:60;
+       background:var(--navy); color:#fff; font-size:13.5px; font-weight:500; padding:11px 18px;
+       border-radius:999px; box-shadow:var(--shadow); max-width:88vw; text-align:center}
+.rot{font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--red); margin:0 0 6px}
+.sub2{font-size:13px; color:var(--muted); margin:0 0 12px; line-height:1.5}
+.pdfnom{font-size:16px; font-weight:600; color:var(--ink); overflow-wrap:anywhere}
+.card.pad .go{display:flex; gap:9px; margin-top:13px}
+.card.pad .go .btn{flex:1}
+.aviso{background:var(--warn-soft); color:var(--warn); border-radius:9px; padding:10px 12px;
+       font-size:12.5px; line-height:1.45; margin-top:11px}
+.enlace{display:flex; align-items:center; gap:8px; margin-top:13px; color:var(--muted);
+        font-size:13px; text-decoration:none}
+.enlace:hover{color:var(--red)}
+.enlace svg{width:17px; height:17px; flex:none}
+.tocar{flex:1; min-width:0; background:transparent; border:0; padding:0; text-align:left; color:inherit}
+.visorcab{display:flex; align-items:flex-start; gap:10px; margin-bottom:14px}
+.visorcab>div:first-child{flex:1; min-width:0}
+.visorcab h2{margin:0 0 3px}
+.etiqueta{font-size:10.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+          color:var(--muted); margin:16px 0 7px}
+.ficha-img{width:100%; border-radius:10px; display:block; background:var(--surface-2);
+           border:1px solid var(--line); cursor:zoom-in}
+.ficha-pdf{position:relative; width:100%; aspect-ratio:1/1.414; border-radius:10px; overflow:hidden;
+           border:1px solid var(--line); background:var(--surface-2)}
+.ficha-pdf.alto{aspect-ratio:1/1.3}
+.ficha-pdf iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+.ficha-falta{background:var(--surface-2); border:1px dashed var(--line); border-radius:10px;
+             padding:16px; font-size:13px; color:var(--muted); text-align:center}
+.ficha-falta .chico{font-size:12px; margin-top:4px; opacity:.85}
+.temas{display:flex; gap:7px; flex-wrap:wrap}
+.temas button{flex:1 1 86px; background:var(--surface-2); border:1px solid var(--line); color:var(--muted);
+  border-radius:9px; padding:11px 8px; font-size:13px; font-weight:600}
+.temas button.on{background:var(--navy); border-color:var(--navy); color:#fff}
+.par{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--line);
+     font-size:13.5px; color:var(--muted)}
+.par:first-of-type{border-top:0}
+.par b{color:var(--ink); font-weight:600}
+.cargando{padding:40px 14px; text-align:center; color:var(--muted)}
+.spin{width:26px; height:26px; margin:0 auto 12px; border:3px solid var(--line);
+      border-top-color:var(--red); border-radius:50%; animation:giro .8s linear infinite}
+
+/* ---------- pantalla del PIN ---------- */
+body.bloqueada{overflow:hidden}
+body.bloqueada .top,body.bloqueada main,body.bloqueada .nav{filter:blur(6px); pointer-events:none}
+.pin{position:fixed; inset:0; z-index:90; background:var(--navy); display:flex; flex-direction:column;
+     align-items:center; justify-content:center; gap:14px;
+     padding:28px max(22px,env(safe-area-inset-left,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(22px,env(safe-area-inset-right,0px))}
+.pin img{width:190px; max-width:68%; height:auto; margin-bottom:10px}
+.pin-t{color:#C3C7DC; font-size:14px; margin:0}
+.pin input{width:220px; max-width:80%; text-align:center; letter-spacing:.42em; font-size:22px;
+  font-family:var(--mono); color:#fff; background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.22); border-radius:11px; padding:13px}
+.pin input:focus{border-color:var(--red); outline:none}
+.pin .btn{width:220px; max-width:80%}
+.pin-msg{color:#F2A0A4; font-size:13px; margin:0; min-height:1.2em; text-align:center}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="wrap">
+    <img src="logo.png" alt="Genebov">
+    <div class="sp"><span class="sec" id="sec">Cartera</span></div>
+    <button class="recargar" id="recargar" title="Actualizar" aria-label="Actualizar"></button>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <div class="cargando"><div class="spin"></div>Cargando los datos de Genebov…</div>
+</main>
+
+<nav class="nav" id="nav"></nav>
+<script>
+
+/* ---------- conexión con Apps Script ----------
+   La pantalla vive aquí; los datos están en tu Google Sheets, detrás del
+   script. Se conserva la forma google.script.run para no tocar el resto. */
+var API = (window.GENEBOV_API || '').trim();
+var TOKEN = '';
+try { TOKEN = localStorage.getItem('genebov_token') || ''; } catch (e) {}
+
+var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEstadoCuenta',
+  'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
+  'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
+  'guardarConfig','guardarTema','importarFichasZip'];
+
+function pedir(accion, args) {
+  if (!API) {
+    return Promise.reject({ message: 'Falta la dirección del script. Revisa el archivo config.js.' });
+  }
+  return fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // así no hay preflight
+    body: JSON.stringify({ accion: accion, args: args || [], token: TOKEN })
+  }).then(function (r) {
+    if (!r.ok) throw { message: 'El servidor respondió ' + r.status };
+    return r.json();
+  }).then(function (d) {
+    if (d && d.error) {
+      if (d.error === 'SESION') { cerrarSesion(true); throw { message: 'Tu sesión venció. Vuelve a entrar.' }; }
+      throw { message: d.error };
+    }
+    return d;
+  }, function (e) {
+    if (e && e.message) throw e;
+    throw { message: 'Sin conexión. Revisa el internet y vuelve a intentar.' };
+  });
+}
+
+var google = { script: { run: (function () {
+  var proto = {
+    withSuccessHandler: function (f) { var o = Object.create(this); o._s = f; return o; },
+    withFailureHandler: function (f) { var o = Object.create(this); o._f = f; return o; }
+  };
+  ACCIONES.forEach(function (nombre) {
+    proto[nombre] = function () {
+      var args = Array.prototype.slice.call(arguments);
+      var s = this._s, f = this._f;
+      pedir(nombre, args).then(function (r) { if (s) s(r); },
+                              function (e) { if (f) f(e); else toast(e.message); });
+    };
+  });
+  return proto;
+})() } };
+
+function cerrarSesion(silencioso) {
+  TOKEN = '';
+  try { localStorage.removeItem('genebov_token'); } catch (e) {}
+  if (!silencioso) location.reload(); else pantallaPin();
+}
+
+/* ---------- pantalla del PIN ---------- */
+function pantallaPin(mensaje) {
+  var v = document.querySelector('.veil'); if (v) v.remove();
+  document.body.classList.add('bloqueada');
+  var p = document.getElementById('pin-pantalla');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = 'pin-pantalla'; p.className = 'pin';
+    p.innerHTML =
+      '<img src="logo.png" alt="Genebov">' +
+      '<p class="pin-t">Escribe el código para entrar</p>' +
+      '<input id="pin-campo" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••">' +
+      '<button class="btn pri" id="pin-ok">Entrar</button>' +
+      '<p class="pin-msg" id="pin-msg"></p>';
+    document.body.appendChild(p);
+    var campo = p.querySelector('#pin-campo'), boton = p.querySelector('#pin-ok');
+    var entrar = function () {
+      var pin = campo.value.trim();
+      if (!pin) { campo.focus(); return; }
+      boton.disabled = true; boton.textContent = 'Entrando…';
+      fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                   body: JSON.stringify({ accion: 'entrar', pin: pin }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          boton.disabled = false; boton.textContent = 'Entrar';
+          if (d.error) { p.querySelector('#pin-msg').textContent = d.error; campo.select(); return; }
+          TOKEN = d.token;
+          try { localStorage.setItem('genebov_token', TOKEN); } catch (e) {}
+          p.remove(); document.body.classList.remove('bloqueada');
+          cargar(true);
+        })
+        .catch(function () {
+          boton.disabled = false; boton.textContent = 'Entrar';
+          p.querySelector('#pin-msg').textContent = 'No pude conectarme. Revisa el internet.';
+        });
+    };
+    boton.onclick = entrar;
+    campo.onkeydown = function (e) { if (e.key === 'Enter') entrar(); };
+    setTimeout(function () { campo.focus(); }, 150);
+  }
+  if (mensaje) p.querySelector('#pin-msg').textContent = mensaje;
+}
+
+
+var SVG = {
+  cartera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><path d="M3 12h18"/></svg>',
+  inv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 16l9 5 9-5"/></svg>',
+  ajustes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-1.8-.3 1.6 1.6 0 00-1 1.5V21a2 2 0 11-4 0v-.1A1.6 1.6 0 008 19.4a1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H2a2 2 0 110-4h.1A1.6 1.6 0 003.6 8a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H8a1.6 1.6 0 001-1.5V2a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V8a1.6 1.6 0 001.5 1H22a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg>',
+  baja:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>',
+  carpeta:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>',
+  cat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v16H4z"/><path d="M13 4h7v16h-7z"/></svg>',
+  rec:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  on:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="1.5" y="6.5" width="21" height="11" rx="5.5"/><circle cx="17" cy="12" r="3" fill="currentColor"/></svg>',
+  off:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="1.5" y="6.5" width="21" height="11" rx="5.5"/><circle cx="7" cy="12" r="3" fill="currentColor"/></svg>',
+  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>'
+};
+
+var D = null, TAB = 'cartera', q = '', TEMA = 'auto';
+var $ = function (s, r) { return (r || document).querySelector(s); };
+
+function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+function plata(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-CO'); }
+function icono(n, t, fn, dis, cls) {
+  var b = el('button', 'ic' + (cls ? ' ' + cls : '')); b.innerHTML = SVG[n];
+  b.title = t; b.setAttribute('aria-label', t); b.disabled = !!dis; b.onclick = fn; return b;
+}
+function toast(m) {
+  var v = $('.toast'); if (v) v.remove();
+  var e = el('div', 'toast', m); document.body.appendChild(e); setTimeout(function () { e.remove(); }, 3000);
+}
+function normal(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+/* ---------------- carga ---------------- */
+function cargar(silencioso) {
+  var b = $('#recargar'); b.classList.add('girando');
+  google.script.run
+    .withSuccessHandler(function (d) {
+      D = d; b.classList.remove('girando');
+      // el tema es de cada dispositivo: el del servidor solo entra si aquí no hay nada guardado
+      if (!TEMA_LOCAL && d.prefs && d.prefs.tema && d.prefs.tema !== TEMA) {
+        TEMA = d.prefs.tema; aplicarTema(TEMA);
+      }
+      pintar();
+      if (!silencioso) toast('Datos actualizados');
+    })
+    .withFailureHandler(function (e) {
+      b.classList.remove('girando');
+      $('#main').innerHTML = '';
+      var c = el('div', 'card pad');
+      c.appendChild(el('h3', null, 'No se pudieron cargar los datos'));
+      c.appendChild(el('p', 'estado', String(e && e.message ? e.message : e)));
+      var r = el('button', 'btn pri', 'Reintentar'); r.style.marginTop = '12px';
+      r.onclick = function () { cargar(); };
+      c.appendChild(r); $('#main').appendChild(c);
+    })
+    .apiTodo();
+}
+
+function pintarNav() {
+  var n = $('#nav'); n.innerHTML = '';
+  [['cartera', 'Cartera'], ['inv', 'Inventario'], ['cat', 'Catálogo'], ['ajustes', 'Ajustes']].forEach(function (t) {
+    var b = el('button', TAB === t[0] ? 'on' : '');
+    b.innerHTML = SVG[t[0]] + '<span>' + t[1] + '</span>';
+    b.onclick = function () { TAB = t[0]; q = ''; pintar(); window.scrollTo(0, 0); };
+    n.appendChild(b);
+  });
+}
+
+function pintar() {
+  pintarNav();
+  $('#sec').textContent = { cartera: 'Cartera', inv: 'Inventario', cat: 'Catálogo', ajustes: 'Ajustes' }[TAB];
+  var m = $('#main'); m.innerHTML = '';
+  if (!D) return;
+  if (TAB === 'cartera') vistaCartera(m);
+  else if (TAB === 'inv') vistaInventario(m);
+  else if (TAB === 'cat') vistaCatalogo(m);
+  else vistaAjustes(m);
+}
+
+function tiles(items) {
+  var t = el('div', 'tiles');
+  items.forEach(function (i) {
+    if (i[0] === null) return;
+    var d = el('div', 'tile' + (i[2] ? ' alert' : ''));
+    d.appendChild(el('b', null, i[0])); d.appendChild(el('span', null, i[1]));
+    t.appendChild(d);
+  });
+  return t;
+}
+
+function buscador(ph, fn) {
+  var b = el('div', 'buscar');
+  var i = document.createElement('input');
+  i.type = 'search'; i.placeholder = ph; i.value = q; i.autocomplete = 'off';
+  i.oninput = function () { q = i.value; fn(); };
+  b.appendChild(i); return b;
+}
+
+/* ---------------- CARTERA ---------------- */
+function vistaCartera(m) {
+  var c = D.cartera;
+  m.appendChild(tiles([
+    [plata(c.total), 'por cobrar'],
+    [String(c.clientes.filter(function (x) { return x.saldo > 0; }).length), 'clientes'],
+    [c.sinTelefono ? String(c.sinTelefono) : null, 'sin teléfono', true]
+  ]));
+  var cont = el('div');
+  m.appendChild(buscador('Buscar cliente…', function () { listaCartera(cont); }));
+  m.appendChild(cont);
+  listaCartera(cont);
+}
+
+function listaCartera(cont) {
+  var c = D.cartera;
+  cont.innerHTML = '';
+  var lista = c.clientes.filter(function (x) {
+    return x.saldo > 0 && (!q || normal(x.cliente).indexOf(normal(q)) > -1);
+  });
+  var card = el('div', 'card');
+  if (!lista.length) card.appendChild(el('div', 'vacio', q ? 'Ningún cliente con ese nombre.' : 'No hay saldos pendientes.'));
+  lista.forEach(function (x) {
+    var f = el('button', 'fila');
+    var mm = el('div', 'm');
+    mm.appendChild(el('div', 't', x.cliente));
+    var s = el('div', 's');
+    var viejas = x.facturas.filter(function (y) { return y.total > 0; });
+    s.appendChild(el('span', null, viejas.length + (viejas.length === 1 ? ' factura' : ' facturas')));
+    var dias = Math.max.apply(null, viejas.map(function (y) { return y.dias || 0; }).concat([0]));
+    if (dias) s.appendChild(el('span', 'chip ' + (dias > 60 ? 'rojo' : dias > 30 ? 'warn' : 'gris'), dias + ' días'));
+    if (!x.telefono) s.appendChild(el('span', 'chip warn', 'Sin teléfono'));
+    mm.appendChild(s); f.appendChild(mm);
+    f.appendChild(el('div', 'v tnum', plata(x.saldo)));
+    f.onclick = function () { hojaCliente(x); };
+    card.appendChild(f);
+  });
+  cont.appendChild(card);
+}
+
+function hojaCliente(x) {
+  var pend = x.facturas.filter(function (f) { return f.total > 0; });
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, x.cliente));
+  h.sh.appendChild(el('p', 'sub', plata(x.saldo) + ' pendiente'));
+
+  var card = el('div', 'card'); card.style.marginBottom = '14px';
+  pend.forEach(function (f) {
+    var r = el('div', 'fila');
+    var mm = el('div', 'm');
+    mm.appendChild(el('div', 't', 'Factura ' + (f.numero || 's/n')));
+    var s = el('div', 's');
+    if (f.fecha) s.appendChild(el('span', null, f.fecha));
+    if (f.dias) s.appendChild(el('span', 'chip ' + (f.dias > 60 ? 'rojo' : f.dias > 30 ? 'warn' : 'gris'), f.dias + ' días'));
+    if (f.abonos) s.appendChild(el('span', 'chip ok', 'abonos ' + plata(f.abonos)));
+    mm.appendChild(s); r.appendChild(mm);
+    r.appendChild(el('div', 'v tnum', plata(f.total)));
+    r.appendChild(icono('edit', 'Registrar abono', function () { h.close(); hojaAbono(x, f); }));
+    card.appendChild(r);
+  });
+  h.sh.appendChild(card);
+
+  var bw = el('button', 'btn wa', 'Enviar estado de cuenta');
+  bw.style.width = '100%';
+  bw.onclick = function () { enviarEstado(x, h); };
+  h.sh.appendChild(bw);
+
+  if (!x.telefono) {
+    h.sh.appendChild(el('p', 'estado', 'Este cliente no tiene teléfono en la hoja Clientes. Te lo pido antes de enviar.'));
+  }
+  var cerrar = el('button', 'btn sec', 'Cerrar');
+  cerrar.style.width = '100%'; cerrar.style.marginTop = '9px';
+  cerrar.onclick = h.close;
+  h.sh.appendChild(cerrar);
+}
+
+function enviarEstado(x, h) {
+  if (!x.telefono) { h.close(); pedirTelefono(x); return; }
+  google.script.run
+    .withSuccessHandler(function (r) {
+      h.close();
+      var url = 'https://wa.me/' + (r.telefono.length === 10 ? '57' + r.telefono : r.telefono) +
+                '?text=' + encodeURIComponent(r.texto);
+      window.open(url, '_blank');
+    })
+    .withFailureHandler(function (e) { toast('No se pudo armar el mensaje'); })
+    .mensajeEstadoCuenta(x.clave);
+}
+
+function pedirTelefono(x) {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, 'Teléfono de ' + x.cliente));
+  h.sh.appendChild(el('p', 'sub', 'Lo guardo en la hoja Clientes para las próximas veces.'));
+  var f = el('div', 'f');
+  f.innerHTML = '<label for="tel">Número de WhatsApp</label>';
+  var i = document.createElement('input');
+  i.id = 'tel'; i.type = 'tel'; i.inputMode = 'numeric'; i.placeholder = '3001234567';
+  f.appendChild(i);
+  f.appendChild(el('p', 'hint', 'Sin indicativo: le pongo el 57 de Colombia.'));
+  h.sh.appendChild(f);
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar y enviar');
+  ok.onclick = function () {
+    var tel = i.value.replace(/\D/g, '');
+    if (tel.length < 7) { toast('El número no parece completo'); i.focus(); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function () {
+        x.telefono = tel; h.close();
+        var hh = { close: function () {} };
+        enviarEstado(x, hh);
+        cargar(true);
+      })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar y enviar'; toast(String(e.message || e)); })
+      .guardarTelefono(x.cliente, tel);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+  i.focus();
+}
+
+function hojaAbono(x, f) {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, 'Abono'));
+  h.sh.appendChild(el('p', 'sub', x.cliente + ' · factura ' + (f.numero || 's/n') + ' · debe ' + plata(f.total)));
+  var ff = el('div', 'f');
+  ff.innerHTML = '<label for="ab">Valor del abono</label>';
+  var i = document.createElement('input');
+  i.id = 'ab'; i.type = 'number'; i.inputMode = 'numeric'; i.min = '1'; i.placeholder = '0';
+  ff.appendChild(i); h.sh.appendChild(ff);
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var v = Number(i.value);
+    if (!(v > 0)) { toast('Escribe el valor del abono'); i.focus(); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function () { h.close(); toast('Abono registrado'); cargar(true); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e.message || e)); })
+      .registrarAbono(f.fila, v);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+  i.focus();
+}
+
+/* ---------------- INVENTARIO ---------------- */
+function vistaInventario(m) {
+  var inv = D.inventario;
+  m.appendChild(tiles([
+    [String(inv.total), 'pajillas'],
+    [String(new Set(inv.existencias.map(function (e) { return e.toro; })).size), 'toros']
+  ]));
+
+  var bv = el('button', 'btn pri', 'Registrar una venta');
+  bv.style.width = '100%';
+  bv.onclick = function () { hojaVenta(); };
+  m.appendChild(bv);
+
+  var dos = el('div', 'dos');
+  var be = el('button', 'btn sec', 'Entrada');
+  be.onclick = function () { hojaMovimiento('Entrada'); };
+  var bt = el('button', 'btn sec', 'Traslado');
+  bt.onclick = function () { hojaMovimiento('Traslado'); };
+  dos.appendChild(be); dos.appendChild(bt);
+  m.appendChild(dos);
+
+  var cont = el('div');
+  cont.style.display = 'flex'; cont.style.flexDirection = 'column'; cont.style.gap = '14px';
+  m.appendChild(buscador('Buscar toro en el inventario…', function () { listaInventario(cont); }));
+  m.appendChild(cont);
+  listaInventario(cont);
+}
+
+function listaInventario(cont) {
+  var inv = D.inventario;
+  cont.innerHTML = '';
+  var porTermo = {};
+  inv.existencias.filter(function (e) {
+    return !q || normal(e.toro).indexOf(normal(q)) > -1;
+  }).forEach(function (e) { (porTermo[e.termo] = porTermo[e.termo] || []).push(e); });
+
+  var llaves = Object.keys(porTermo);
+  if (!llaves.length) {
+    var v = el('div', 'card'); v.appendChild(el('div', 'vacio', 'Sin existencias para esa búsqueda.'));
+    cont.appendChild(v);
+  }
+  llaves.forEach(function (t) {
+    var card = el('div', 'card');
+    var hd = el('div', 'hdr');
+    hd.appendChild(el('h3', null, t));
+    hd.appendChild(el('span', 'n', porTermo[t].reduce(function (s, e) { return s + e.cantidad; }, 0) + ' pajillas'));
+    card.appendChild(hd);
+    porTermo[t].forEach(function (e) {
+      var f = el('div', 'fila');
+      var mm = el('div', 'm');
+      mm.appendChild(el('div', 't', e.toro));
+      var s = el('div', 's'); s.appendChild(el('span', null, 'Canastilla ' + e.canastilla));
+      mm.appendChild(s); f.appendChild(mm);
+      f.appendChild(el('div', 'v tnum', String(e.cantidad)));
+      card.appendChild(f);
+    });
+    cont.appendChild(card);
+  });
+
+  var ult = el('div', 'card');
+  var hd2 = el('div', 'hdr'); hd2.appendChild(el('h3', null, 'Últimos movimientos'));
+  ult.appendChild(hd2);
+  inv.movimientos.slice(0, 15).forEach(function (mv) {
+    var f = el('div', 'fila');
+    var mm = el('div', 'm');
+    mm.appendChild(el('div', 't', mv.toro + '  ·  ' + mv.cantidad));
+    var s = el('div', 's');
+    s.appendChild(el('span', 'chip ' + (mv.tipo === 'Salida' ? 'rojo' : mv.tipo === 'Entrada' ? 'ok' : 'gris'), mv.tipo));
+    s.appendChild(el('span', null, mv.fecha));
+    if (mv.cliente) s.appendChild(el('span', null, mv.cliente));
+    mm.appendChild(s); f.appendChild(mm);
+    ult.appendChild(f);
+  });
+  cont.appendChild(ult);
+}
+
+function hojaVenta() {
+  var inv = D.inventario, h = hoja();
+  var foto = null, items = [];
+
+  h.sh.appendChild(el('h2', null, 'Registrar una venta'));
+  h.sh.appendChild(el('p', 'sub', 'Toma la foto de la factura y yo leo el total.'));
+
+  var vista = document.createElement('img'); vista.className = 'foto'; vista.hidden = true;
+  h.sh.appendChild(vista);
+
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.hidden = true;
+  var bfoto = el('button', 'subir', 'Tomar o escoger la foto de la factura');
+  var est = el('p', 'estado', '');
+  h.sh.appendChild(inp); h.sh.appendChild(bfoto); h.sh.appendChild(est);
+
+  var campos = el('div'); campos.style.marginTop = '14px';
+  campos.innerHTML =
+    '<div class="f2">' +
+      '<div class="f"><label for="v-fac">Factura #</label><input id="v-fac" type="text" autocomplete="off"></div>' +
+      '<div class="f"><label for="v-fecha">Fecha</label><input id="v-fecha" type="date"></div>' +
+    '</div>' +
+    '<div class="f"><label for="v-cli">Cliente</label><input id="v-cli" type="text" list="v-clientes" autocomplete="off">' +
+      '<datalist id="v-clientes"></datalist></div>' +
+    '<div class="f"><label for="v-total">Total de la factura</label><input id="v-total" type="number" inputmode="numeric" placeholder="0"></div>' +
+    '<div class="f"><label>Pajillas que salen</label><div class="lista" id="v-items"></div>' +
+      '<button class="subir" id="v-add" style="padding:10px; margin-top:8px">+  Agregar toro</button>' +
+      '<p class="hint">Salen del termo de transporte. Si la venta fue solo de nitrógeno, déjalo vacío.</p></div>';
+  h.sh.appendChild(campos);
+
+  var dl = $('#v-clientes', h.sh);
+  D.cartera.clientes.forEach(function (c) {
+    var o = document.createElement('option'); o.value = c.cliente; dl.appendChild(o);
+  });
+  $('#v-fecha', h.sh).value = new Date().toISOString().slice(0, 10);
+
+  function pintarItems() {
+    var cont = $('#v-items', h.sh); cont.innerHTML = '';
+    items.forEach(function (it, i) {
+      var row = el('div', 'item');
+      var sel = document.createElement('select');
+      sel.innerHTML = '<option value="">Toro…</option>' + inv.listas.toros.map(function (t) {
+        return '<option value="' + t.replace(/"/g, '&quot;') + '"' + (t === it.toro ? ' selected' : '') + '>' + t + '</option>';
+      }).join('');
+      sel.onchange = function () { it.toro = sel.value; };
+      var cant = document.createElement('input');
+      cant.type = 'number'; cant.inputMode = 'numeric'; cant.min = '1'; cant.placeholder = 'Cant.';
+      cant.value = it.cantidad || ''; cant.oninput = function () { it.cantidad = cant.value; };
+      var q = icono('x', 'Quitar', function () { items.splice(i, 1); pintarItems(); });
+      row.appendChild(sel); row.appendChild(cant); row.appendChild(q);
+      cont.appendChild(row);
+    });
+  }
+  $('#v-add', h.sh).onclick = function (ev) {
+    ev.preventDefault(); items.push({ toro: '', cantidad: '', canastilla: '1' }); pintarItems();
+  };
+
+  bfoto.onclick = function () { inp.click(); };
+  inp.onchange = function () {
+    var f = inp.files && inp.files[0]; if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      var b64 = String(r.result).split(',')[1];
+      foto = { base64: b64, mime: f.type || 'image/jpeg', nombre: f.name || 'factura.jpg' };
+      vista.src = r.result; vista.hidden = false;
+      bfoto.textContent = 'Cambiar la foto';
+      est.textContent = 'Leyendo la factura…';
+      google.script.run
+        .withSuccessHandler(function (d) {
+          if (d && d.ok) {
+            if (d.total) $('#v-total', h.sh).value = d.total;
+            if (d.factura) $('#v-fac', h.sh).value = d.factura;
+            if (d.cliente && !$('#v-cli', h.sh).value) $('#v-cli', h.sh).value = d.cliente;
+            est.textContent = 'Leí la factura. Revisa los datos antes de guardar.';
+          } else if (d && d.motivo === 'sin_clave') {
+            est.textContent = 'Escribe el total a mano (falta configurar la clave de Gemini).';
+          } else {
+            est.textContent = 'No pude leer la factura. Escribe el total a mano.';
+          }
+        })
+        .withFailureHandler(function () { est.textContent = 'No pude leer la factura. Escribe el total a mano.'; })
+        .leerFactura(b64, foto.mime);
+    };
+    r.readAsDataURL(f);
+  };
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar la venta');
+  ok.onclick = function () {
+    var cli = $('#v-cli', h.sh).value.trim();
+    var tot = Number($('#v-total', h.sh).value);
+    if (!cli) { toast('Falta el cliente'); return; }
+    if (!(tot > 0) && !items.length) { toast('Falta el total o las pajillas'); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        h.close();
+        toast('Venta registrada' + (r.movimientos ? ' · ' + r.movimientos + ' salidas' : ''));
+        cargar(true);
+      })
+      .withFailureHandler(function (e) {
+        ok.disabled = false; ok.textContent = 'Guardar la venta'; toast(String(e.message || e));
+      })
+      .registrarVenta({
+        fecha: $('#v-fecha', h.sh).value, cliente: cli, factura: $('#v-fac', h.sh).value.trim(),
+        total: tot, items: items, foto: foto
+      });
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
+function hojaMovimiento(tipo) {
+  var inv = D.inventario, h = hoja(), items = [];
+  var entrada = tipo === 'Entrada';
+
+  h.sh.appendChild(el('h2', null, entrada ? 'Registrar una entrada' : 'Registrar un traslado'));
+  h.sh.appendChild(el('p', 'sub', entrada
+    ? 'Pajillas que llegan. Si el toro es nuevo, lo creas aquí mismo.'
+    : 'Pajillas que se mueven de un termo o canastilla a otro.'));
+
+  var opc = function (lista, sel) {
+    return lista.map(function (x) {
+      return '<option value="' + String(x).replace(/"/g, '&quot;') + '"' +
+             (String(x) === String(sel) ? ' selected' : '') + '>' + x + '</option>';
+    }).join('');
+  };
+
+  var campos = el('div');
+  campos.innerHTML =
+    '<div class="f"><label for="mv-fecha">Fecha</label><input id="mv-fecha" type="date"></div>' +
+    '<div class="f2">' +
+      '<div class="f"><label for="mv-termo">' + (entrada ? 'Termo' : 'Termo de origen') + '</label>' +
+        '<select id="mv-termo">' + opc(inv.listas.termos) + '</select></div>' +
+      '<div class="f"><label for="mv-can">Canastilla</label>' +
+        '<select id="mv-can">' + opc(inv.listas.canastillas) + '</select></div>' +
+    '</div>' +
+    (entrada ? '' :
+      '<div class="f2">' +
+        '<div class="f"><label for="mv-termo2">Termo de destino</label>' +
+          '<select id="mv-termo2">' + opc(inv.listas.termos) + '</select></div>' +
+        '<div class="f"><label for="mv-can2">Canastilla destino</label>' +
+          '<select id="mv-can2">' + opc(inv.listas.canastillas) + '</select></div>' +
+      '</div>') +
+    '<div class="f"><label>Toros</label><div class="lista" id="mv-items"></div>' +
+      '<div class="dos" style="margin-top:8px">' +
+        '<button class="subir" id="mv-add" style="padding:10px">+  Toro de la lista</button>' +
+        '<button class="subir" id="mv-nuevo" style="padding:10px">+  Toro nuevo</button>' +
+      '</div></div>' +
+    '<div class="f"><label for="mv-obs">Observaciones</label><input id="mv-obs" type="text" autocomplete="off"></div>';
+  h.sh.appendChild(campos);
+  $('#mv-fecha', h.sh).value = new Date().toISOString().slice(0, 10);
+
+  function pintar2() {
+    var c = $('#mv-items', h.sh); c.innerHTML = '';
+    if (!items.length) { c.appendChild(el('div', 'vacio', 'Todavía no has agregado toros.')); return; }
+    items.forEach(function (it, i) {
+      var row = el('div', 'item');
+      if (it.nuevo) {
+        var nom = el('div', 'm');
+        nom.appendChild(el('div', 't', it.toro));
+        var s2 = el('div', 's');
+        s2.appendChild(el('span', 'chip rojo', 'Nuevo'));
+        if (it.nuevo.catalogo) {
+          var rz = null;
+          D.catalogo.razas.forEach(function (r) { if (r.codigo === it.nuevo.raza) rz = r; });
+          s2.appendChild(el('span', 'chip gris', 'Al catálogo' + (rz ? ' · ' + rz.nombre : '')));
+          if ((it.nuevo.paginas || []).length) s2.appendChild(el('span', 'chip ok', 'con ficha'));
+        }
+        nom.appendChild(s2);
+        row.appendChild(nom);
+      } else {
+        var sel = document.createElement('select');
+        sel.innerHTML = '<option value="">Toro…</option>' + opc(inv.listas.toros, it.toro);
+        sel.onchange = function () { it.toro = sel.value; };
+        row.appendChild(sel);
+      }
+      var cant = document.createElement('input');
+      cant.type = 'number'; cant.inputMode = 'numeric'; cant.min = '1'; cant.placeholder = 'Cant.';
+      cant.value = it.cantidad || ''; cant.oninput = function () { it.cantidad = cant.value; };
+      row.appendChild(cant);
+      row.appendChild(icono('x', 'Quitar', function () { items.splice(i, 1); pintar2(); }));
+      c.appendChild(row);
+    });
+  }
+  pintar2();
+
+  $('#mv-add', h.sh).onclick = function (e) {
+    e.preventDefault(); items.push({ toro: '', cantidad: '' }); pintar2();
+  };
+  $('#mv-nuevo', h.sh).onclick = function (e) {
+    e.preventDefault();
+    hojaToroNuevo(function (it) { items.push(it); pintar2(); });
+  };
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var listos = items.filter(function (i) { return i.toro && Number(i.cantidad) > 0; });
+    if (!listos.length) { toast('Agrega al menos un toro con cantidad'); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        h.close();
+        var msg = r.tipo + ' registrada · ' + r.movimientos + (r.movimientos === 1 ? ' línea' : ' líneas');
+        if (r.alCatalogo && r.alCatalogo.length) msg += ' · ' + r.alCatalogo.length + ' al catálogo';
+        toast(msg); cargar(true);
+      })
+      .withFailureHandler(function (e) {
+        ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e.message || e));
+      })
+      .registrarMovimiento({
+        tipo: tipo, fecha: $('#mv-fecha', h.sh).value,
+        termo: $('#mv-termo', h.sh).value, canastilla: $('#mv-can', h.sh).value,
+        termoDestino: entrada ? '' : $('#mv-termo2', h.sh).value,
+        canastillaDestino: entrada ? '' : $('#mv-can2', h.sh).value,
+        observaciones: $('#mv-obs', h.sh).value.trim(), items: listos
+      });
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
+/** Define un toro que no existía y lo devuelve como línea del movimiento. */
+function hojaToroNuevo(cuando) {
+  var h = hoja(), pags = [];
+  h.sh.appendChild(el('h2', null, 'Toro nuevo'));
+  h.sh.appendChild(el('p', 'sub', 'Entra al inventario. Si le pones la raza, también queda en el catálogo.'));
+
+  var c = el('div');
+  c.innerHTML =
+    '<div class="f2">' +
+      '<div class="f"><label for="n-nom">Nombre</label><input id="n-nom" type="text" autocomplete="off"></div>' +
+      '<div class="f"><label for="n-cant">Cantidad</label><input id="n-cant" type="number" inputmode="numeric" min="1"></div>' +
+    '</div>' +
+    '<div class="f"><label>¿Va también al catálogo?</label><div class="seg">' +
+      '<label><input type="radio" name="n-cat" value="1" checked><span>Sí</span></label>' +
+      '<label><input type="radio" name="n-cat" value=""><span>Solo al inventario</span></label>' +
+    '</div></div>' +
+    '<div id="n-cat-campos">' +
+      '<div class="f"><label for="n-raza">Raza</label><select id="n-raza"></select></div>' +
+      '<div class="f2">' +
+        '<div class="f"><label for="n-cod">Código o registro</label><input id="n-cod" type="text" autocomplete="off"></div>' +
+        '<div class="f"><label for="n-nac">Origen</label><select id="n-nac">' +
+          '<option value="">Importado</option><option value="1">Nacional</option></select></div>' +
+      '</div>' +
+      '<div class="f"><label>Ficha técnica</label><div class="lista" id="n-fichas"></div>' +
+        '<input type="file" id="n-file" accept="application/pdf,image/*" multiple hidden>' +
+        '<button class="subir" id="n-sub" style="padding:11px; margin-top:8px">+  Subir la ficha</button>' +
+        '<p class="estado" id="n-est"></p>' +
+        '<p class="hint">Opcional. Si no la tienes ahora, el toro queda marcado como "falta ficha".</p></div>' +
+    '</div>';
+  h.sh.appendChild(c);
+
+  $('#n-raza', h.sh).innerHTML = D.catalogo.razas.map(function (r) {
+    return '<option value="' + r.codigo + '">' + r.nombre + '</option>';
+  }).join('');
+
+  var sync = function () {
+    $('#n-cat-campos', h.sh).hidden = !h.sh.querySelector('input[name="n-cat"]:checked').value;
+  };
+  h.sh.querySelectorAll('input[name="n-cat"]').forEach(function (r) { r.onchange = sync; });
+  sync();
+
+  function pintarF() {
+    var cc = $('#n-fichas', h.sh); cc.innerHTML = '';
+    if (!pags.length) { cc.appendChild(el('div', 'vacio', 'Sin ficha todavía.')); return; }
+    pags.forEach(function (p, i) {
+      var row = el('div', 'item'); row.style.gridTemplateColumns = '1fr auto';
+      var nm = el('div', 's'); nm.style.gridColumn = '1/-1';
+      nm.innerHTML = SVG.doc;
+      nm.appendChild(el('span', 'code', p.nombreArchivo));
+      row.appendChild(nm);
+      var lab = document.createElement('input');
+      lab.type = 'text'; lab.value = p.label || ''; lab.placeholder = 'Etiqueta';
+      lab.oninput = function () { p.label = lab.value; };
+      row.appendChild(lab);
+      row.appendChild(icono('x', 'Quitar', function () { pags.splice(i, 1); pintarF(); }));
+      var sl = document.createElement('select');
+      sl.innerHTML = '<option value="1">Página completa</option><option value="">Dentro del catálogo</option>';
+      sl.value = p.completa ? '1' : '';
+      sl.onchange = function () { p.completa = !!sl.value; };
+      sl.style.gridColumn = '1/-1';
+      row.appendChild(sl);
+      cc.appendChild(row);
+    });
+  }
+  pintarF();
+
+  var file = $('#n-file', h.sh), bsub = $('#n-sub', h.sh), est = $('#n-est', h.sh);
+  bsub.onclick = function (e) { e.preventDefault(); file.click(); };
+  file.onchange = function () {
+    var fs = Array.prototype.slice.call(file.files || []); file.value = '';
+    if (!fs.length) return;
+    bsub.disabled = true;
+    var pend = fs.length;
+    fs.forEach(function (f) {
+      est.textContent = 'Subiendo ' + f.name + '…';
+      var r = new FileReader();
+      r.onload = function () {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            pags.push({ label: '', archivos: [res.ref], nombreArchivo: res.nombre,
+                        completa: /\.pdf$/i.test(f.name) });
+            pintarF();
+            if (--pend === 0) { est.textContent = ''; bsub.disabled = false; }
+          })
+          .withFailureHandler(function () {
+            toast('No se pudo subir ' + f.name);
+            if (--pend === 0) { est.textContent = ''; bsub.disabled = false; }
+          })
+          .subirFicha(f.name, f.type, String(r.result).split(',')[1]);
+      };
+      r.readAsDataURL(f);
+    });
+  };
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Agregar');
+  ok.onclick = function () {
+    var nom = $('#n-nom', h.sh).value.trim();
+    var cant = Number($('#n-cant', h.sh).value);
+    if (!nom) { toast('Escribe el nombre del toro'); return; }
+    if (!(cant > 0)) { toast('Escribe cuántas pajillas entran'); return; }
+    var alCat = !!h.sh.querySelector('input[name="n-cat"]:checked').value;
+    var nac = $('#n-nac', h.sh).value === '1';
+    h.close();
+    cuando({
+      toro: nom, cantidad: cant,
+      nuevo: {
+        catalogo: alCat, raza: alCat ? $('#n-raza', h.sh).value : '',
+        codigo: nac ? '' : $('#n-cod', h.sh).value.trim(), nacional: nac,
+        paginas: alCat ? pags : []
+      }
+    });
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+  $('#n-nom', h.sh).focus();
+}
+
+/* ---------------- CATÁLOGO ---------------- */
+function vistaCatalogo(m) {
+  var k = D.catalogo;
+  var activos = k.toros.filter(function (t) { return t.activo; });
+  var sinFicha = activos.filter(function (t) { return !t.paginas.length; }).length;
+  m.appendChild(tiles([
+    [String(activos.length), 'toros'],
+    [String(k.razas.length), 'razas'],
+    [sinFicha ? String(sinFicha) : null, 'sin ficha', true]
+  ]));
+  m.appendChild(tarjetaPDF());
+  var cont = el('div');
+  cont.style.display = 'flex'; cont.style.flexDirection = 'column'; cont.style.gap = '14px';
+  m.appendChild(buscador('Buscar toro…', function () { listaCatalogo(cont); }));
+  m.appendChild(cont);
+  listaCatalogo(cont);
+}
+
+function listaCatalogo(cont) {
+  var k = D.catalogo;
+  cont.innerHTML = '';
+  k.razas.slice().sort(function (a, b) { return (a.orden || 0) - (b.orden || 0); }).forEach(function (r) {
+    var toros = k.toros.filter(function (t) {
+      return t.raza === r.codigo && (!q || normal(t.nombre).indexOf(normal(q)) > -1);
+    }).sort(function (a, b) { return a.orden - b.orden; });
+    if (q && !toros.length) return;
+
+    var card = el('div', 'card');
+    var hd = el('div', 'hdr');
+    var sig = el('span', 'chip rojo', r.codigo); sig.style.background = 'var(--red)'; sig.style.color = '#fff';
+    hd.appendChild(sig);
+    hd.appendChild(el('h3', null, r.nombre));
+    var nAct = toros.filter(function (t) { return t.activo; }).length;
+    hd.appendChild(el('span', 'n', nAct + (nAct === 1 ? ' toro' : ' toros')));
+    hd.appendChild(icono('edit', 'Editar la raza', function () { hojaRaza(r); }));
+    card.appendChild(hd);
+
+    if (!toros.length) card.appendChild(el('div', 'vacio', 'Sin toros en esta raza.'));
+    toros.forEach(function (t, i) {
+      var f = el('div', 'fila' + (t.activo ? '' : ' off'));
+      var mm = el('div', 'm');
+      mm.appendChild(el('div', 't', t.nombre));
+      var s = el('div', 's');
+      if (t.codigo) s.appendChild(el('span', 'code', t.codigo));
+      else if (t.nacional) s.appendChild(el('span', 'chip rojo', 'Nacional'));
+      if (!t.activo) s.appendChild(el('span', 'chip gris', 'Fuera del PDF'));
+      if (!t.paginas.length) s.appendChild(el('span', 'chip warn', 'Falta ficha'));
+      if (t.nota) s.appendChild(el('span', 'chip gris', t.nota));
+      mm.appendChild(s);
+      var abrir = el('button', 'tocar');
+      abrir.appendChild(mm);
+      abrir.onclick = function () { verToro(t); };
+      f.appendChild(abrir);
+      f.appendChild(icono(t.activo ? 'on' : 'off', t.activo ? 'Sacar del PDF' : 'Volver a incluir', function () {
+        t.activo = !t.activo;
+        google.script.run.withSuccessHandler(function () {
+          toast(t.activo ? t.nombre + ' vuelve al PDF' : t.nombre + ' queda fuera'); cargar(true);
+        }).withFailureHandler(function (e) { toast(String(e.message || e)); }).guardarToro(t);
+      }, false, t.activo ? 'on' : ''));
+      f.appendChild(icono('edit', 'Editar', function () { hojaToro(t, r.codigo); }));
+      card.appendChild(f);
+    });
+
+    var add = el('button', 'accion', '+  Agregar toro a ' + r.nombre);
+    add.onclick = function () { hojaToro(null, r.codigo); };
+    card.appendChild(add);
+    cont.appendChild(card);
+  });
+
+  var ar = el('button', 'btn sec', '+  Agregar una raza');
+  ar.style.width = '100%';
+  ar.onclick = function () { hojaRaza(null); };
+  cont.appendChild(ar);
+}
+
+/* ---------------- ver el catálogo ---------------- */
+function verToro(t) {
+  var h = hoja();
+  var raza = null;
+  D.catalogo.razas.forEach(function (r) { if (r.codigo === t.raza) raza = r; });
+
+  var cab = el('div', 'visorcab');
+  var tt = el('div');
+  tt.appendChild(el('p', 'rot', raza ? raza.nombre : t.raza));
+  tt.appendChild(el('h2', null, t.nombre));
+  var s = el('div', 's');
+  if (t.codigo) s.appendChild(el('span', 'code', t.codigo));
+  else if (t.nacional) s.appendChild(el('span', 'chip rojo', 'Nacional'));
+  tt.appendChild(s);
+  cab.appendChild(tt);
+  cab.appendChild(icono('x', 'Cerrar', h.close));
+  h.sh.appendChild(cab);
+
+  var paginas = (t.paginas || []).filter(function (p) { return (p.vistas || []).length; });
+  if (!paginas.length) {
+    var v = el('div', 'vacio', 'Este toro todavía no tiene ficha.');
+    v.style.background = 'var(--surface-2)'; v.style.borderRadius = '10px';
+    h.sh.appendChild(v);
+  }
+
+  paginas.forEach(function (p) {
+    if (p.label) h.sh.appendChild(el('p', 'etiqueta', p.label));
+    p.vistas.forEach(function (v) {
+      if (v.tipo === 'imagen') {
+        var img = document.createElement('img');
+        img.className = 'ficha-img'; img.src = v.src; img.alt = t.nombre; img.loading = 'lazy';
+        img.onclick = function () { window.open(v.ver, '_blank'); };
+        img.onerror = function () {
+          img.replaceWith(el('div', 'ficha-falta', 'No pude cargar esta ficha desde Drive.'));
+        };
+        h.sh.appendChild(img);
+      } else if (v.tipo === 'pdf') {
+        var marco = el('div', 'ficha-pdf');
+        var ifr = document.createElement('iframe');
+        ifr.src = v.src; ifr.loading = 'lazy'; ifr.setAttribute('allow', 'autoplay');
+        marco.appendChild(ifr);
+        h.sh.appendChild(marco);
+        var a = document.createElement('a');
+        a.className = 'enlace'; a.href = v.ver; a.target = '_blank'; a.rel = 'noopener';
+        a.innerHTML = SVG.doc; a.appendChild(el('span', null, 'Abrir esta ficha en grande'));
+        h.sh.appendChild(a);
+      } else {
+        var falta = el('div', 'ficha-falta');
+        falta.appendChild(el('div', null, 'Esta ficha todavía no está en Drive.'));
+        falta.appendChild(el('div', 'chico', v.nombre + ' — impórtala desde Ajustes.'));
+        h.sh.appendChild(falta);
+      }
+    });
+  });
+
+  var ed = el('button', 'btn sec', 'Editar este toro');
+  ed.style.width = '100%'; ed.style.marginTop = '16px';
+  ed.onclick = function () { h.close(); hojaToro(t, t.raza); };
+  h.sh.appendChild(ed);
+}
+
+function verPDFCompleto() {
+  var p = D.catalogo.pdf || {};
+  if (!p.id) { toast('Todavía no hay PDF en la carpeta de Drive'); return; }
+  var h = hoja();
+  var cab = el('div', 'visorcab');
+  var tt = el('div');
+  tt.appendChild(el('p', 'rot', 'Catálogo completo'));
+  tt.appendChild(el('h2', null, (D.catalogo.config || {}).edicion || 'Catálogo de toros'));
+  cab.appendChild(tt);
+  cab.appendChild(icono('x', 'Cerrar', h.close));
+  h.sh.appendChild(cab);
+  var marco = el('div', 'ficha-pdf alto');
+  var ifr = document.createElement('iframe');
+  ifr.src = 'https://drive.google.com/file/d/' + p.id + '/preview';
+  marco.appendChild(ifr);
+  h.sh.appendChild(marco);
+  var a = document.createElement('a');
+  a.className = 'enlace'; a.href = p.ver; a.target = '_blank'; a.rel = 'noopener';
+  a.innerHTML = SVG.doc; a.appendChild(el('span', null, 'Abrirlo en grande'));
+  h.sh.appendChild(a);
+}
+
+function tarjetaPDF() {
+  var p = (D.catalogo && D.catalogo.pdf) || {};
+  var card = el('div', 'card pad');
+  card.appendChild(el('p', 'rot', 'PDF del catálogo'));
+
+  if (!p.id) {
+    card.appendChild(el('p', 'sub2',
+      'Todavía no hay PDF. Pídeselo a Claude en el chat y guárdalo en la carpeta del catálogo en Drive: ' +
+      'la app lo toma solo y queda aquí para descargarlo.'));
+  } else {
+    card.appendChild(el('div', 'pdfnom', p.nombre));
+    var partes = [];
+    if (p.fecha) partes.push(p.fecha);
+    if (p.tamano) partes.push(p.tamano + ' MB');
+    card.appendChild(el('div', 'sub2', partes.join('  ·  ')));
+
+    var go = el('div', 'go');
+    var dl = document.createElement('a');
+    dl.className = 'btn pri'; dl.href = p.descarga; dl.target = '_blank'; dl.rel = 'noopener';
+    dl.style.textDecoration = 'none'; dl.style.textAlign = 'center';
+    dl.textContent = 'Descargar el PDF';
+    go.appendChild(dl);
+    var ver = el('button', 'btn sec', 'Ver aquí');
+    ver.onclick = verPDFCompleto;
+    go.appendChild(ver);
+    card.appendChild(go);
+
+    if (p.viejo) {
+      card.appendChild(el('div', 'aviso',
+        'La lista cambió desde que se generó este PDF. Pídele a Claude que lo actualice.'));
+    }
+  }
+
+  if (p.carpeta) {
+    var c = document.createElement('a');
+    c.className = 'enlace'; c.href = p.carpeta; c.target = '_blank'; c.rel = 'noopener';
+    c.innerHTML = SVG.carpeta; c.appendChild(el('span', null, 'Abrir la carpeta del catálogo en Drive'));
+    card.appendChild(c);
+  }
+  return card;
+}
+
+function hojaToro(t, raza) {
+  var nuevo = !t;
+  t = t || { id: '', nombre: '', raza: raza, codigo: '', nacional: false, activo: true, nota: '', paginas: [] };
+  var pags = JSON.parse(JSON.stringify(t.paginas || []));
+  var h = hoja();
+
+  h.sh.appendChild(el('h2', null, nuevo ? 'Agregar toro' : t.nombre));
+  var cont = el('div');
+  cont.innerHTML =
+    '<div class="f"><label for="t-nom">Nombre</label><input id="t-nom" type="text" autocomplete="off"></div>' +
+    '<div class="f"><label for="t-raza">Raza</label><select id="t-raza"></select></div>' +
+    '<div class="f2">' +
+      '<div class="f"><label for="t-cod">Código o registro</label><input id="t-cod" type="text" autocomplete="off"></div>' +
+      '<div class="f"><label for="t-nac">Origen</label><select id="t-nac">' +
+        '<option value="">Importado</option><option value="1">Nacional</option></select></div>' +
+    '</div>' +
+    '<div class="f"><label>Fichas del toro</label><div class="lista" id="t-fichas"></div>' +
+      '<input type="file" id="t-file" accept="application/pdf,image/*" multiple hidden>' +
+      '<button class="subir" id="t-sub" style="padding:11px; margin-top:8px">+  Subir una ficha</button>' +
+      '<p class="estado" id="t-est"></p>' +
+      '<p class="hint">Cada archivo es una página del catálogo. <b>Página completa</b> si la ficha ya trae su encabezado.</p></div>' +
+    '<div class="f"><label for="t-nota">Nota</label><input id="t-nota" type="text" autocomplete="off"></div>';
+  h.sh.appendChild(cont);
+
+  $('#t-raza', h.sh).innerHTML = D.catalogo.razas.map(function (r) {
+    return '<option value="' + r.codigo + '"' + (r.codigo === t.raza ? ' selected' : '') + '>' + r.nombre + '</option>';
+  }).join('');
+  $('#t-nom', h.sh).value = t.nombre;
+  $('#t-cod', h.sh).value = t.codigo || '';
+  $('#t-nac', h.sh).value = t.nacional && !t.codigo ? '1' : '';
+  $('#t-nota', h.sh).value = t.nota || '';
+
+  function pintarFichas() {
+    var c = $('#t-fichas', h.sh); c.innerHTML = '';
+    if (!pags.length) { c.appendChild(el('div', 'vacio', 'Sin fichas todavía.')); return; }
+    pags.forEach(function (p, i) {
+      var row = el('div', 'item'); row.style.gridTemplateColumns = '1fr auto';
+      var nm = el('div', 's'); nm.style.gridColumn = '1/-1';
+      nm.innerHTML = SVG.doc;
+      nm.appendChild(el('span', 'code', p.nombreArchivo || p.archivos.join(', ')));
+      row.appendChild(nm);
+      var lab = document.createElement('input');
+      lab.type = 'text'; lab.value = p.label || ''; lab.placeholder = 'Etiqueta';
+      lab.oninput = function () { p.label = lab.value; };
+      row.appendChild(lab);
+      row.appendChild(icono('x', 'Quitar', function () { pags.splice(i, 1); pintarFichas(); }));
+      var sel = document.createElement('select');
+      sel.innerHTML = '<option value="1">Página completa</option><option value="">Dentro del catálogo</option>';
+      sel.value = p.completa ? '1' : '';
+      sel.onchange = function () { p.completa = !!sel.value; };
+      sel.style.gridColumn = '1/-1';
+      row.appendChild(sel);
+      c.appendChild(row);
+    });
+  }
+  pintarFichas();
+
+  var file = $('#t-file', h.sh), bs2 = $('#t-sub', h.sh), est = $('#t-est', h.sh);
+  bs2.onclick = function (ev) { ev.preventDefault(); file.click(); };
+  file.onchange = function () {
+    var fs = Array.prototype.slice.call(file.files || []); file.value = '';
+    if (!fs.length) return;
+    bs2.disabled = true;
+    var pend = fs.length;
+    fs.forEach(function (f) {
+      est.textContent = 'Subiendo ' + f.name + '…';
+      var r = new FileReader();
+      r.onload = function () {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            pags.push({ label: '', archivos: [res.ref], nombreArchivo: res.nombre,
+                        completa: /\.pdf$/i.test(f.name) });
+            pintarFichas();
+            if (--pend === 0) { est.textContent = ''; bs2.disabled = false; }
+          })
+          .withFailureHandler(function (e) {
+            toast('No se pudo subir ' + f.name);
+            if (--pend === 0) { est.textContent = ''; bs2.disabled = false; }
+          })
+          .subirFicha(f.name, f.type, String(r.result).split(',')[1]);
+      };
+      r.readAsDataURL(f);
+    });
+  };
+
+  var bs = el('div', 'btns');
+  if (!nuevo) {
+    var del = el('button', 'btn sec', 'Eliminar');
+    del.onclick = function () { h.close(); confirmarBorrar(t); };
+    bs.appendChild(del);
+  }
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var nom = $('#t-nom', h.sh).value.trim();
+    if (!nom) { toast('Escribe el nombre del toro'); return; }
+    var nac = $('#t-nac', h.sh).value === '1';
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function () { h.close(); toast(nuevo ? nom + ' agregado' : 'Guardado'); cargar(true); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e.message || e)); })
+      .guardarToro({
+        id: t.id, nombre: nom, raza: $('#t-raza', h.sh).value,
+        codigo: nac ? '' : $('#t-cod', h.sh).value.trim(), nacional: nac,
+        orden: t.orden || 0, activo: t.activo !== false,
+        nota: $('#t-nota', h.sh).value.trim(), paginas: pags
+      });
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
+function confirmarBorrar(t) {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, '¿Eliminar a ' + t.nombre + '?'));
+  h.sh.appendChild(el('p', 'sub', 'Se borra de la lista y no vuelve a salir en el PDF. Si solo quieres sacarlo de esta edición, usa el interruptor.'));
+  var bs = el('div', 'btns');
+  var no = el('button', 'btn sec', 'Cancelar'); no.onclick = h.close;
+  var si = el('button', 'btn pri', 'Eliminar');
+  si.onclick = function () {
+    si.disabled = true;
+    google.script.run
+      .withSuccessHandler(function () { h.close(); toast(t.nombre + ' eliminado'); cargar(true); })
+      .withFailureHandler(function (e) { si.disabled = false; toast(String(e.message || e)); })
+      .borrarToro(t.id);
+  };
+  bs.appendChild(no); bs.appendChild(si); h.sh.appendChild(bs);
+}
+
+function hojaRaza(r) {
+  var nueva = !r;
+  r = r || { codigo: '', nombre: '', descripcion: '', orden: 0 };
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, nueva ? 'Agregar raza' : r.nombre));
+  var c = el('div');
+  c.innerHTML =
+    '<div class="f2">' +
+      '<div class="f"><label for="r-sig">Sigla</label><input id="r-sig" type="text" maxlength="4" autocomplete="off"></div>' +
+      '<div class="f"><label for="r-ord">Orden</label><input id="r-ord" type="number" inputmode="numeric"></div>' +
+    '</div>' +
+    '<div class="f"><label for="r-nom">Nombre</label><input id="r-nom" type="text" autocomplete="off"></div>' +
+    '<div class="f"><label for="r-des">Descripción</label><textarea id="r-des"></textarea>' +
+      '<p class="hint">Sale en la página que abre la sección en el PDF.</p></div>';
+  h.sh.appendChild(c);
+  $('#r-sig', h.sh).value = r.codigo; $('#r-nom', h.sh).value = r.nombre;
+  $('#r-des', h.sh).value = r.descripcion || ''; $('#r-ord', h.sh).value = r.orden || '';
+  if (!nueva) $('#r-sig', h.sh).disabled = true;
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var sig = $('#r-sig', h.sh).value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    var nom = $('#r-nom', h.sh).value.trim();
+    if (!sig || !nom) { toast('Falta la sigla o el nombre'); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function () { h.close(); toast('Guardado'); cargar(true); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e.message || e)); })
+      .guardarRaza({ codigo: sig, nombre: nom, descripcion: $('#r-des', h.sh).value.trim(),
+                     orden: Number($('#r-ord', h.sh).value) || 0 });
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
+/* ---------------- AJUSTES ---------------- */
+function vistaAjustes(m) {
+  // tema
+  var c1 = el('div', 'card pad');
+  c1.appendChild(el('p', 'rot', 'Apariencia'));
+  c1.appendChild(el('p', 'sub2', 'Cómo se ve la app. "Automático" sigue lo que tenga tu teléfono.'));
+  var g = el('div', 'temas');
+  [['auto', 'Automático'], ['claro', 'Claro'], ['oscuro', 'Oscuro']].forEach(function (t) {
+    var b = el('button', TEMA === t[0] ? 'on' : '', t[1]);
+    b.onclick = function () {
+      TEMA = t[0]; aplicarTema(TEMA); pintar();
+      google.script.run.withSuccessHandler(function () {}).withFailureHandler(function () {}).guardarTema(TEMA);
+    };
+    g.appendChild(b);
+  });
+  c1.appendChild(g);
+  m.appendChild(c1);
+
+  // catálogo
+  var cfg = (D.catalogo && D.catalogo.config) || {};
+  var c2 = el('div', 'card pad');
+  c2.appendChild(el('p', 'rot', 'Catálogo'));
+  var f1 = el('div', 'f');
+  f1.innerHTML = '<label for="a-ed">Edición</label>';
+  var i1 = document.createElement('input');
+  i1.id = 'a-ed'; i1.type = 'text'; i1.value = cfg.edicion || ''; i1.placeholder = 'Septiembre 2026';
+  i1.onchange = function () { guardar('edicion', i1.value.trim(), 'Edición guardada'); };
+  f1.appendChild(i1);
+  f1.appendChild(el('p', 'hint', 'Sale en la portada del PDF y en el nombre del archivo.'));
+  c2.appendChild(f1);
+
+  var f2 = el('div', 'f'); f2.style.marginBottom = '0';
+  f2.innerHTML = '<label for="a-nota">Nota para Claude</label>';
+  var i2 = document.createElement('textarea');
+  i2.id = 'a-nota'; i2.value = cfg.nota || '';
+  i2.placeholder = 'Ej.: cambiar la ficha de Korn por la nueva prueba.';
+  i2.onchange = function () { guardar('nota', i2.value.trim(), 'Nota guardada'); };
+  f2.appendChild(i2);
+  f2.appendChild(el('p', 'hint', 'Lo que quieras pedirle para la próxima versión del catálogo.'));
+  c2.appendChild(f2);
+  m.appendChild(c2);
+
+  // datos
+  var c3 = el('div', 'card pad');
+  c3.appendChild(el('p', 'rot', 'Datos'));
+  c3.appendChild(el('p', 'sub2', 'La app lee y escribe en tu archivo ' + (D.archivo || 'de Google Sheets') + '.'));
+  var filas = [
+    ['Clientes con saldo', String(D.cartera.clientes.filter(function (x) { return x.saldo > 0; }).length)],
+    ['Pajillas en inventario', String(D.inventario.total)],
+    ['Toros en el catálogo', String(D.catalogo.toros.filter(function (t) { return t.activo; }).length)]
+  ];
+  filas.forEach(function (f) {
+    var r = el('div', 'par');
+    r.appendChild(el('span', null, f[0])); r.appendChild(el('b', 'tnum', f[1]));
+    c3.appendChild(r);
+  });
+  var b = el('button', 'btn sec', 'Actualizar los datos');
+  b.style.width = '100%'; b.style.marginTop = '12px';
+  b.onclick = function () { cargar(); };
+  c3.appendChild(b);
+  m.appendChild(c3);
+
+  // fichas que todavía no están en Drive
+  var faltan = 0;
+  D.catalogo.toros.forEach(function (t) {
+    (t.paginas || []).forEach(function (p) {
+      (p.vistas || []).forEach(function (v) { if (v.tipo === 'falta') faltan++; });
+    });
+  });
+  var c4 = el('div', 'card pad');
+  c4.appendChild(el('p', 'rot', 'Fichas del catálogo'));
+  if (faltan) {
+    c4.appendChild(el('p', 'sub2', 'Hay ' + faltan + ' fichas que todavía no están en tu Drive, así que no se ven ' +
+      'dentro de la app. Claude te manda un archivo ZIP con todas: guárdalo en la carpeta ' +
+      '"Genebov - Catálogo PDF" de tu Drive y toca el botón.'));
+  } else {
+    c4.appendChild(el('p', 'sub2', 'Todas las fichas están en tu Drive y se ven dentro de la app.'));
+  }
+  var bi = el('button', faltan ? 'btn pri' : 'btn sec', 'Importar fichas desde el ZIP');
+  bi.style.width = '100%';
+  bi.onclick = function () {
+    bi.disabled = true; bi.textContent = 'Importando… puede tardar un minuto';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        bi.disabled = false; bi.textContent = 'Importar fichas desde el ZIP';
+        toast('Listo: ' + r.subidos + ' fichas importadas');
+        cargar(true);
+      })
+      .withFailureHandler(function (e) {
+        bi.disabled = false; bi.textContent = 'Importar fichas desde el ZIP';
+        toast(String(e.message || e));
+      })
+      .importarFichasZip();
+  };
+  c4.appendChild(bi);
+  m.appendChild(c4);
+
+  var c5 = el('div', 'card pad');
+  c5.appendChild(el('p', 'rot', 'Sesión'));
+  c5.appendChild(el('p', 'sub2', 'Este teléfono queda abierto hasta que cierres la sesión. ' +
+    'Ciérrala si vas a prestar el aparato o si lo pierdes.'));
+  var bx = el('button', 'btn sec', 'Cerrar sesión en este teléfono');
+  bx.style.width = '100%';
+  bx.onclick = function () { cerrarSesion(); };
+  c5.appendChild(bx);
+  m.appendChild(c5);
+}
+
+function guardar(clave, valor, msg) {
+  google.script.run
+    .withSuccessHandler(function () { toast(msg); cargar(true); })
+    .withFailureHandler(function (e) { toast(String(e.message || e)); })
+    .guardarConfig(clave, valor);
+}
+
+function aplicarTema(t) {
+  if (t && t !== 'auto') document.documentElement.setAttribute('data-tema', t);
+  else document.documentElement.removeAttribute('data-tema');
+  try { localStorage.setItem('tema', t || 'auto'); } catch (e) {}
+}
+
+/* ---------------- hoja modal ---------------- */
+function hoja() {
+  var veil = el('div', 'veil'), sh = el('div', 'sheet');
+  veil.appendChild(sh);
+  var close = function () { veil.remove(); };
+  veil.onclick = function (e) { if (e.target === veil) close(); };
+  document.body.appendChild(veil);
+  return { veil: veil, sh: sh, close: close };
+}
+
+/* ---------------- arranque ---------------- */
+var TEMA_LOCAL = null;
+try { TEMA_LOCAL = localStorage.getItem('tema'); } catch (e) {}
+TEMA = TEMA_LOCAL || 'auto';
+aplicarTema(TEMA);
+$('#recargar').innerHTML = SVG.rec;
+$('#recargar').onclick = function () { cargar(); };
+pintarNav();
+if (TOKEN) cargar(true);
+
+
+/* ---------- service worker y sesión ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+if (!TOKEN) pantallaPin();
+
+</script>
+</body>
+</html>
