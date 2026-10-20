@@ -677,7 +677,7 @@ function hojaVenta() {
   h.sh.appendChild(vista);
 
   var inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment'; inp.hidden = true;
+  inp.type = 'file'; inp.accept = 'image/*'; inp.hidden = true;
   var bfoto = el('button', 'subir', 'Tomar o escoger la foto de la factura');
   var est = el('p', 'estado', '');
   h.sh.appendChild(inp); h.sh.appendChild(bfoto); h.sh.appendChild(est);
