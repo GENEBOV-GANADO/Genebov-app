@@ -376,6 +376,52 @@ function normal(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+/* ---------------- foto de la factura ---------------- */
+/** Achica la foto antes de mandarla: con 1600 px Gemini la lee igual de bien,
+ *  sube en segundos por datos móviles y no se pasa de ningún límite. */
+function achicar(file, lado, listo) {
+  var r = new FileReader();
+  r.onload = function () {
+    var original = String(r.result);
+    var img = new Image();
+    img.onload = function () {
+      var w = img.naturalWidth, hh = img.naturalHeight;
+      var esc = Math.min(1, lado / Math.max(w, hh));
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w * esc)); c.height = Math.max(1, Math.round(hh * esc));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      try { listo(c.toDataURL('image/jpeg', 0.85), 'image/jpeg'); }
+      catch (e) { listo(original, file.type || 'image/jpeg'); }
+    };
+    img.onerror = function () { listo(original, file.type || 'image/jpeg'); };   // si no se deja, va como está
+    img.src = original;
+  };
+  r.readAsDataURL(file);
+}
+
+/** "19/10/26" o "19-10-2026" -> "2026-10-19", para el campo de fecha. */
+function fechaISO(s) {
+  var m = String(s || '').match(/(\d{1,2})\D+(\d{1,2})\D+(\d{2,4})/);
+  if (!m) return '';
+  var a = m[3].length === 2 ? '20' + m[3] : m[3];
+  var mes = +m[2], dia = +m[1];
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return '';
+  return a + '-' + ('0' + mes).slice(-2) + '-' + ('0' + dia).slice(-2);
+}
+
+/** Lo que respondió Gemini cuando no se pudo, en una línea. */
+function motivoGemini(d) {
+  if (!d) return '';
+  if (d.motivo === 'ilegible') return ' (Gemini respondió, pero no en el formato esperado.)';
+  if (d.motivo === 'error_api') {
+    var msg = String(d.detalle || '');
+    var mm = msg.match(/"message"\s*:\s*"([^"]+)/);
+    if (mm) msg = mm[1];
+    return msg ? ' (Gemini: ' + msg.slice(0, 180) + ')' : '';
+  }
+  return '';
+}
+
 /* ---------------- carga ---------------- */
 function cargar(silencioso) {
   var b = $('#recargar'); b.classList.add('girando');
@@ -726,11 +772,12 @@ function hojaVenta() {
   bfoto.onclick = function () { inp.click(); };
   inp.onchange = function () {
     var f = inp.files && inp.files[0]; if (!f) return;
-    var r = new FileReader();
-    r.onload = function () {
-      var b64 = String(r.result).split(',')[1];
-      foto = { base64: b64, mime: f.type || 'image/jpeg', nombre: f.name || 'factura.jpg' };
-      vista.src = r.result; vista.hidden = false;
+    est.textContent = 'Preparando la foto…';
+    achicar(f, 1600, function (dataUrl, mime) {
+      var b64 = dataUrl.split(',')[1];
+      var base = String(f.name || 'factura').replace(/\.[^.]+$/, '');
+      foto = { base64: b64, mime: mime, nombre: base + (mime === 'image/jpeg' ? '.jpg' : '') };
+      vista.src = dataUrl; vista.hidden = false;
       bfoto.textContent = 'Cambiar la foto';
       est.textContent = 'Leyendo la factura…';
       google.script.run
@@ -739,17 +786,21 @@ function hojaVenta() {
             if (d.total) $('#v-total', h.sh).value = d.total;
             if (d.factura) $('#v-fac', h.sh).value = d.factura;
             if (d.cliente && !$('#v-cli', h.sh).value) $('#v-cli', h.sh).value = d.cliente;
+            var iso = fechaISO(d.fecha);
+            if (iso) $('#v-fecha', h.sh).value = iso;
             est.textContent = 'Leí la factura. Revisa los datos antes de guardar.';
           } else if (d && d.motivo === 'sin_clave') {
             est.textContent = 'Escribe el total a mano (falta configurar la clave de Gemini).';
           } else {
-            est.textContent = 'No pude leer la factura. Escribe el total a mano.';
+            est.textContent = 'No pude leer la factura. Escribe el total a mano.' + motivoGemini(d);
           }
         })
-        .withFailureHandler(function () { est.textContent = 'No pude leer la factura. Escribe el total a mano.'; })
-        .leerFactura(b64, foto.mime);
-    };
-    r.readAsDataURL(f);
+        .withFailureHandler(function (e) {
+          est.textContent = 'No pude leer la factura. Escribe el total a mano. (' +
+            String(e && e.message ? e.message : e) + ')';
+        })
+        .leerFactura(b64, mime);
+    });
   };
 
   var bs = el('div', 'btns');
