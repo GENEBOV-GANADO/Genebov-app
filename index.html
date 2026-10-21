@@ -376,6 +376,12 @@ function normal(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+var TERMO_VENTA = 'Termo transporte pajillas';   // de aquí salen las ventas; igual que en Codigo.gs
+function escHtml(t) {
+  return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 /* ---------------- foto de la factura ---------------- */
 /** Achica la foto antes de mandarla: con 1600 px Gemini la lee igual de bien,
  *  sube en segundos por datos móviles y no se pasa de ningún límite. */
@@ -748,25 +754,63 @@ function hojaVenta() {
   });
   $('#v-fecha', h.sh).value = new Date().toISOString().slice(0, 10);
 
+  // las ventas salen del termo de transporte: solo se ofrece lo que hay ahí, con su canastilla
+  var disp = (inv.existencias || []).filter(function (e) {
+    return e.termo === TERMO_VENTA && e.cantidad > 0;
+  }).sort(function (a, b) {
+    return String(a.toro).localeCompare(String(b.toro)) || String(a.canastilla).localeCompare(String(b.canastilla));
+  });
+  function hayEn(it) {
+    for (var k = 0; k < disp.length; k++) {
+      if (disp[k].toro === it.toro && String(disp[k].canastilla) === String(it.canastilla)) return disp[k];
+    }
+    return null;
+  }
+
   function pintarItems() {
     var cont = $('#v-items', h.sh); cont.innerHTML = '';
     items.forEach(function (it, i) {
+      var caja = el('div');
       var row = el('div', 'item');
       var sel = document.createElement('select');
-      sel.innerHTML = '<option value="">Toro…</option>' + inv.listas.toros.map(function (t) {
-        return '<option value="' + t.replace(/"/g, '&quot;') + '"' + (t === it.toro ? ' selected' : '') + '>' + t + '</option>';
-      }).join('');
-      sel.onchange = function () { it.toro = sel.value; };
+      var actual = it.toro ? (it.canastilla + '|' + it.toro) : '';
+      sel.innerHTML = '<option value="">' + (it.leido && !it.toro ? 'Escoge el toro…' : 'Toro…') + '</option>' +
+        disp.map(function (e) {
+          var v = e.canastilla + '|' + e.toro;
+          return '<option value="' + escHtml(v) + '"' + (v === actual ? ' selected' : '') + '>' +
+                 escHtml(e.toro) + ' · can. ' + escHtml(e.canastilla) + ' · ' + e.cantidad + '</option>';
+        }).join('');
+      var aviso = el('p', 'hint', '');
+      function avisar() {
+        var e = it.toro ? hayEn(it) : null;
+        if (it.leido && !it.toro) {
+          aviso.textContent = 'En la factura dice «' + it.leido + '» y no lo encuentro en el termo de transporte. ' +
+                              'Escógelo de la lista, o haz primero el traslado.';
+        } else if (e && Number(it.cantidad) > e.cantidad) {
+          aviso.textContent = 'En esa canastilla solo hay ' + e.cantidad + '.';
+        } else {
+          aviso.textContent = '';
+        }
+        aviso.hidden = !aviso.textContent;
+      }
+      sel.onchange = function () {
+        var p = sel.value.split('|');
+        it.canastilla = p[0] || ''; it.toro = p.slice(1).join('|');
+        avisar();
+      };
       var cant = document.createElement('input');
       cant.type = 'number'; cant.inputMode = 'numeric'; cant.min = '1'; cant.placeholder = 'Cant.';
-      cant.value = it.cantidad || ''; cant.oninput = function () { it.cantidad = cant.value; };
+      cant.value = it.cantidad || '';
+      cant.oninput = function () { it.cantidad = cant.value; avisar(); };   // sin repintar: no se pierde el cursor
       var q = icono('x', 'Quitar', function () { items.splice(i, 1); pintarItems(); });
       row.appendChild(sel); row.appendChild(cant); row.appendChild(q);
-      cont.appendChild(row);
+      caja.appendChild(row); caja.appendChild(aviso);
+      avisar();
+      cont.appendChild(caja);
     });
   }
   $('#v-add', h.sh).onclick = function (ev) {
-    ev.preventDefault(); items.push({ toro: '', cantidad: '', canastilla: '1' }); pintarItems();
+    ev.preventDefault(); items.push({ toro: '', cantidad: '', canastilla: '' }); pintarItems();
   };
 
   bfoto.onclick = function () { inp.click(); };
@@ -788,7 +832,16 @@ function hojaVenta() {
             if (d.cliente && !$('#v-cli', h.sh).value) $('#v-cli', h.sh).value = d.cliente;
             var iso = fechaISO(d.fecha);
             if (iso) $('#v-fecha', h.sh).value = iso;
-            est.textContent = 'Leí la factura. Revisa los datos antes de guardar.';
+            var n = 0;
+            if (d.items && d.items.length) {
+              items = d.items.map(function (x) {
+                return { toro: x.toro || '', canastilla: x.canastilla || '', cantidad: x.cantidad || '', leido: x.leido || '' };
+              });
+              n = items.length;
+              pintarItems();
+            }
+            est.textContent = 'Leí la factura' + (n ? ' y ' + n + (n === 1 ? ' línea de pajillas' : ' líneas de pajillas') : '') +
+                              '. Revisa los datos antes de guardar.';
           } else if (d && d.motivo === 'sin_clave') {
             est.textContent = 'Escribe el total a mano (falta configurar la clave de Gemini).';
           } else {
