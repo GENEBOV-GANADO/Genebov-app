@@ -178,6 +178,8 @@ main{padding-block:16px 24px; display:flex; flex-direction:column; gap:14px}
 .card.pad .go .btn{flex:1}
 .aviso{background:var(--warn-soft); color:var(--warn); border-radius:9px; padding:10px 12px;
        font-size:12.5px; line-height:1.45; margin-top:11px}
+.compartir{width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin:2px 0 16px}
+.compartir svg{width:18px; height:18px; flex:none}
 .enlace{display:flex; align-items:center; gap:8px; margin-top:13px; color:var(--muted);
         font-size:13px; text-decoration:none}
 .enlace:hover{color:var(--red)}
@@ -251,7 +253,7 @@ try { TOKEN = localStorage.getItem('genebov_token') || ''; } catch (e) {}
 var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEstadoCuenta',
   'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
   'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
-  'guardarConfig','guardarTema','importarFichasZip','generarLista'];
+  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro'];
 
 function pedir(accion, args) {
   if (!API) {
@@ -356,6 +358,7 @@ var SVG = {
   x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
   on:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="1.5" y="6.5" width="21" height="11" rx="5.5"/><circle cx="17" cy="12" r="3" fill="currentColor"/></svg>',
   off:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="1.5" y="6.5" width="21" height="11" rx="5.5"/><circle cx="7" cy="12" r="3" fill="currentColor"/></svg>',
+  share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>',
   doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>'
 };
 
@@ -1187,6 +1190,70 @@ function listaCatalogo(cont) {
   cont.appendChild(ar);
 }
 
+/* ---------------- compartir la ficha de un toro ---------------- */
+/** Manda la ficha como archivos (imagen o PDF) por el menú de compartir del
+ *  teléfono. En iPhone, si la ficha tarda en bajar, el sistema pide un segundo
+ *  toque para abrir el menú: el botón queda diciendo "toca para enviar". */
+function botonCompartir(t, raza) {
+  var b = el('button', 'btn pri compartir');
+  b.innerHTML = SVG.share;
+  var rotulo = el('span', null, 'Compartir la ficha');
+  b.appendChild(rotulo);
+
+  var texto = 'Ficha de ' + t.nombre + (raza ? ' · ' + raza.nombre : '') +
+              (t.codigo ? ' · ' + t.codigo : (t.nacional ? ' · Toro nacional' : '')) +
+              '\nGenebov – Genética Bovina';
+  var listos = null, modo = 'nada';      // nada | archivos | enlace
+
+  function poner(txt, ocupado) { rotulo.textContent = txt; b.disabled = !!ocupado; }
+
+  function porEnlace() {
+    var links = [];
+    (t.paginas || []).forEach(function (p) {
+      (p.vistas || []).forEach(function (v) { if (v.ver) links.push(v.ver); });
+    });
+    window.open('https://wa.me/?text=' + encodeURIComponent(texto + '\n\n' + links.join('\n')), '_blank');
+  }
+
+  function enviar() {
+    navigator.share({ files: listos, title: 'Ficha de ' + t.nombre, text: texto }).then(
+      function () { poner('Compartir la ficha'); },
+      function (e) {
+        var n = e && e.name;
+        if (n === 'AbortError') { poner('Compartir la ficha'); return; }              // cerró el menú
+        if (n === 'NotAllowedError') { poner('Lista · toca para enviar'); return; }   // iPhone: otro toque
+        modo = 'enlace'; poner('Enviar el enlace por WhatsApp');
+      });
+  }
+
+  b.onclick = function () {
+    if (modo === 'archivos') { enviar(); return; }
+    if (modo === 'enlace') { porEnlace(); return; }
+    if (!navigator.share || !navigator.canShare) { porEnlace(); return; }   // computador sin menú de compartir
+    poner('Preparando la ficha…', true);
+    google.script.run
+      .withSuccessHandler(function (r) {
+        var archivos = ((r && r.archivos) || []).map(function (a) {
+          var bin = atob(a.base64), arr = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          return new File([arr], a.nombre, { type: a.mime });
+        });
+        var puede = false;
+        try { puede = archivos.length && navigator.canShare({ files: archivos }); } catch (e) {}
+        if (!puede) { modo = 'enlace'; poner('Enviar el enlace por WhatsApp'); return; }
+        listos = archivos; modo = 'archivos';
+        poner('Compartir la ficha');
+        enviar();
+      })
+      .withFailureHandler(function (e) {
+        poner('Compartir la ficha');
+        toast(String(e && e.message ? e.message : e));
+      })
+      .archivosToro(t.id);
+  };
+  return b;
+}
+
 /* ---------------- ver el catálogo ---------------- */
 function verToro(t) {
   var h = hoja();
@@ -1206,6 +1273,8 @@ function verToro(t) {
   h.sh.appendChild(cab);
 
   var paginas = (t.paginas || []).filter(function (p) { return (p.vistas || []).length; });
+  var enDrive = paginas.some(function (p) { return p.vistas.some(function (v) { return v.id; }); });
+  if (enDrive) h.sh.appendChild(botonCompartir(t, raza));
   if (!paginas.length) {
     var v = el('div', 'vacio', 'Este toro todavía no tiene ficha.');
     v.style.background = 'var(--surface-2)'; v.style.borderRadius = '10px';
