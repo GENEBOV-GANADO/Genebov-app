@@ -255,7 +255,7 @@ try { TOKEN = localStorage.getItem('genebov_token') || ''; } catch (e) {}
 var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEstadoCuenta',
   'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
   'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
-  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro','ordenarCartera'];
+  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro','ordenarCartera','apiNitrogeno','registrarCarga','guardarPlazo'];
 
 function pedir(accion, args) {
   if (!API) {
@@ -382,6 +382,12 @@ function normal(s) {
 }
 
 var TERMO_VENTA = 'Termo transporte pajillas';   // de aquí salen las ventas; igual que en Codigo.gs
+/** Hoy, en la fecha del teléfono. toISOString() da la fecha en hora universal:
+ *  después de las 7 de la noche en Colombia ya sería mañana. */
+function hoyISO() {
+  var d = new Date();
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
 function escHtml(t) {
   return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -701,6 +707,138 @@ function hojaAbono(x, f) {
   i.focus();
 }
 
+/* ---------------- nitrógeno ---------------- */
+function textoN2(t) {
+  if (!t.ultima) return '';
+  var cuando = t.dias === 0 ? 'Hoy' : t.dias === 1 ? 'Ayer' : 'Hace ' + t.dias + ' días';
+  return cuando + ' · ' + String(t.litros).replace('.', ',') + ' L';
+}
+function chipN2(t) {
+  if (t.estado === 'sin') return el('span', 'chip gris', 'Sin cargas');
+  if (t.estado === 'vencido') {
+    var a = -t.faltan;
+    return el('span', 'chip rojo', a === 0 ? 'Le toca hoy' : 'Atrasado ' + a + (a === 1 ? ' día' : ' días'));
+  }
+  if (t.estado === 'pronto') return el('span', 'chip warn', 'Le toca en ' + t.faltan + (t.faltan === 1 ? ' día' : ' días'));
+  if (t.estado === 'ok') return el('span', 'chip ok', 'Al día');
+  return null;
+}
+
+function tarjetaNitrogeno() {
+  var nz = D.nitrogeno || { termos: [] };
+  var card = el('div', 'card');
+  var hd = el('div', 'hdr');
+  hd.appendChild(el('h3', null, 'Nitrógeno'));
+  var atrasados = nz.termos.filter(function (t) { return t.estado === 'vencido'; }).length;
+  if (atrasados) hd.appendChild(el('span', 'chip rojo', atrasados + ' por cargar'));
+  card.appendChild(hd);
+  if (nz.error) card.appendChild(el('div', 'vacio', 'No pude leer la hoja de nitrógeno: ' + nz.error));
+
+  nz.termos.forEach(function (t) {
+    var f = el('div', 'fila');
+    var mm = el('div', 'm');
+    mm.appendChild(el('div', 't', t.termo));
+    var s = el('div', 's');
+    var txt = textoN2(t);
+    if (txt) s.appendChild(el('span', null, txt));
+    var c = chipN2(t); if (c) s.appendChild(c);
+    mm.appendChild(s);
+    var abrir = el('button', 'tocar');
+    abrir.appendChild(mm);
+    abrir.onclick = function () { hojaTermoN2(t); };
+    f.appendChild(abrir);
+    f.appendChild(icono('edit', 'Cada cuántos días se carga', function () { hojaTermoN2(t); }));
+    card.appendChild(f);
+  });
+
+  var add = el('button', 'accion', '+  Registrar carga de nitrógeno');
+  add.onclick = function () { hojaCarga(''); };
+  card.appendChild(add);
+  return card;
+}
+
+function hojaCarga(termo) {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, 'Carga de nitrógeno'));
+  var f = el('div');
+  f.innerHTML =
+    '<div class="f"><label for="n-termo">Termo</label><select id="n-termo"></select></div>' +
+    '<div class="f2">' +
+      '<div class="f"><label for="n-fecha">Fecha</label><input id="n-fecha" type="date"></div>' +
+      '<div class="f"><label for="n-lit">Litros</label><input id="n-lit" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0"></div>' +
+    '</div>';
+  h.sh.appendChild(f);
+  var sel = $('#n-termo', h.sh);
+  sel.innerHTML = (termo ? '' : '<option value="">Escoge el termo…</option>') +
+    (D.nitrogeno.termos || []).map(function (t) {
+      return '<option value="' + escHtml(t.termo) + '"' + (t.termo === termo ? ' selected' : '') + '>' + escHtml(t.termo) + '</option>';
+    }).join('');
+  $('#n-fecha', h.sh).value = hoyISO();
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var d = { termo: sel.value, fecha: $('#n-fecha', h.sh).value, litros: Number($('#n-lit', h.sh).value) };
+    if (!d.termo) { toast('Escoge el termo'); return; }
+    if (!(d.litros > 0)) { toast('Escribe cuántos litros se cargaron'); $('#n-lit', h.sh).focus(); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) { D.nitrogeno = r; h.close(); toast('Carga anotada: ' + d.termo); pintar(); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e && e.message ? e.message : e)); })
+      .registrarCarga(d);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+  if (!termo) sel.focus(); else $('#n-lit', h.sh).focus();
+}
+
+function hojaTermoN2(t) {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, t.termo));
+  var est = el('div', 's'); est.style.marginBottom = '12px';
+  var txt = textoN2(t);
+  est.appendChild(el('span', null, txt ? 'Última carga: ' + t.ultima + ' · ' + txt : 'Todavía no tiene cargas anotadas.'));
+  var c = chipN2(t); if (c) est.appendChild(c);
+  h.sh.appendChild(est);
+
+  var f = el('div', 'f');
+  f.innerHTML = '<label for="n-cada">Cada cuántos días se carga</label>' +
+    '<input id="n-cada" type="number" inputmode="numeric" min="0" placeholder="Sin aviso">' +
+    '<p class="hint">La app lo marca en naranja unos días antes y en rojo cuando se pasa. Déjalo vacío si no quieres aviso para este termo.</p>';
+  h.sh.appendChild(f);
+  $('#n-cada', h.sh).value = t.cada || '';
+
+  var hist = (D.nitrogeno.recientes || []).filter(function (x) { return x.termo === t.termo; }).slice(0, 6);
+  if (hist.length) {
+    h.sh.appendChild(el('p', 'rot', 'Últimas cargas'));
+    hist.forEach(function (x) {
+      var r = el('div', 'par');
+      r.appendChild(el('span', null, x.fecha)); r.appendChild(el('b', 'tnum', String(x.litros).replace('.', ',') + ' L'));
+      h.sh.appendChild(r);
+    });
+  }
+
+  var nueva = el('button', 'btn sec', '+  Registrar carga de este termo');
+  nueva.style.width = '100%'; nueva.style.marginTop = '14px';
+  nueva.onclick = function () { h.close(); hojaCarga(t.termo); };
+  h.sh.appendChild(nueva);
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cerrar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar plazo');
+  ok.onclick = function () {
+    var v = $('#n-cada', h.sh).value.trim();
+    var dias = v === '' ? 0 : Number(v);
+    if (!(dias >= 0)) { toast('Escribe un número de días'); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) { D.nitrogeno = r; h.close(); toast(dias ? t.termo + ': cada ' + dias + ' días' : t.termo + ': sin aviso'); pintar(); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar plazo'; toast(String(e && e.message ? e.message : e)); })
+      .guardarPlazo(t.termo, dias);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
 /* ---------------- INVENTARIO ---------------- */
 function vistaInventario(m) {
   var inv = D.inventario;
@@ -721,6 +859,7 @@ function vistaInventario(m) {
   bt.onclick = function () { hojaMovimiento('Traslado'); };
   dos.appendChild(be); dos.appendChild(bt);
   m.appendChild(dos);
+  m.appendChild(tarjetaNitrogeno());
 
   var cont = el('div');
   cont.style.display = 'flex'; cont.style.flexDirection = 'column'; cont.style.gap = '14px';
@@ -813,7 +952,7 @@ function hojaVenta() {
   D.cartera.clientes.forEach(function (c) {
     var o = document.createElement('option'); o.value = c.cliente; dl.appendChild(o);
   });
-  $('#v-fecha', h.sh).value = new Date().toISOString().slice(0, 10);
+  $('#v-fecha', h.sh).value = hoyISO();
 
   // el cliente, como ya está en la cartera: "Francisco Valenzuela" es "Dr. Francisco valenzuela"
   function ajustarCliente(deLaFactura) {
@@ -1029,7 +1168,7 @@ function hojaMovimiento(tipo) {
       '</div></div>' +
     '<div class="f"><label for="mv-obs">Observaciones</label><input id="mv-obs" type="text" autocomplete="off"></div>';
   h.sh.appendChild(campos);
-  $('#mv-fecha', h.sh).value = new Date().toISOString().slice(0, 10);
+  $('#mv-fecha', h.sh).value = hoyISO();
 
   function pintar2() {
     var c = $('#mv-items', h.sh); c.innerHTML = '';
