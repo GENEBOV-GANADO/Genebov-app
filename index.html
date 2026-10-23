@@ -172,6 +172,7 @@ main{padding-block:16px 24px; display:flex; flex-direction:column; gap:14px}
        background:var(--navy); color:#fff; font-size:13.5px; font-weight:500; padding:11px 18px;
        border-radius:999px; box-shadow:var(--shadow); max-width:88vw; text-align:center}
 .rot{font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--red); margin:0 0 6px}
+.enlace{background:none; border:0; padding:0; color:var(--red); font:inherit; font-weight:600; text-decoration:underline; cursor:pointer}
 .sub2{font-size:13px; color:var(--muted); margin:0 0 12px; line-height:1.5}
 .pdfnom{font-size:16px; font-weight:600; color:var(--ink); overflow-wrap:anywhere}
 .card.pad .go{display:flex; gap:9px; margin-top:13px}
@@ -255,7 +256,8 @@ try { TOKEN = localStorage.getItem('genebov_token') || ''; } catch (e) {}
 var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEstadoCuenta',
   'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
   'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
-  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro','ordenarCartera','apiNitrogeno','registrarCarga','guardarPlazo'];
+  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro','ordenarCartera','apiNitrogeno','registrarCarga','guardarPlazo',
+  'registrarN2Cliente','guardarPlazoCliente'];
 
 function pedir(accion, args) {
   if (!API) {
@@ -388,6 +390,18 @@ function hoyISO() {
   var d = new Date();
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
 }
+/** Una fecha leída de la factura que cae lejos de hoy casi siempre es el año mal
+ *  leído (un 26 que parece 24): se deja la del año que la acerque a hoy. */
+function fechaCreible(iso) {
+  var p = String(iso).split('-').map(Number), hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+  var dif = function (a) { return Math.abs((new Date(a, p[1] - 1, p[2], 12) - hoy) / 864e5); };
+  if (!p[0] || dif(p[0]) <= 120) return iso;
+  var y = hoy.getFullYear(), mejor = null;
+  [y, y - 1].forEach(function (a) { if (dif(a) <= 120 && (mejor === null || dif(a) < dif(mejor))) mejor = a; });
+  return mejor === null ? iso : mejor + String(iso).slice(4);
+}
+function fechaBonita(iso) { var p = String(iso).split('-'); return +p[2] + '/' + +p[1] + '/' + p[0]; }
+function litrosTxt(n) { return String(Math.round((Number(n) || 0) * 10) / 10).replace('.', ',') + ' L'; }
 function escHtml(t) {
   return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -617,6 +631,13 @@ function hojaCliente(x) {
   });
   h.sh.appendChild(card);
 
+  var n2 = n2DelCliente(x.cliente);
+  if (n2) {
+    var cn = el('div', 'card'); cn.style.marginBottom = '14px';
+    cn.appendChild(filaN2Cliente(n2, function () { h.close(); hojaClienteN2(n2); }, 'Nitrógeno'));
+    h.sh.appendChild(cn);
+  }
+
   var bw = el('button', 'btn wa', 'Enviar estado de cuenta');
   bw.style.width = '100%';
   bw.onclick = function () { enviarEstado(x, h); };
@@ -644,7 +665,7 @@ function enviarEstado(x, h) {
     .mensajeEstadoCuenta(x.clave);
 }
 
-function pedirTelefono(x) {
+function pedirTelefono(x, luego) {
   var h = hoja();
   h.sh.appendChild(el('h2', null, 'Teléfono de ' + x.cliente));
   h.sh.appendChild(el('p', 'sub', 'Lo guardo en la hoja Clientes para las próximas veces.'));
@@ -666,6 +687,7 @@ function pedirTelefono(x) {
     google.script.run
       .withSuccessHandler(function () {
         x.telefono = tel; h.close();
+        if (luego) { luego(tel); cargar(true); return; }
         var hh = { close: function () {} };
         enviarEstado(x, hh);
         cargar(true);
@@ -839,6 +861,238 @@ function hojaTermoN2(t) {
   bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
 }
 
+/* ---------------- nitrógeno de los clientes ---------------- */
+function n2DelCliente(nombre) {
+  var lista = (D.nitrogeno && D.nitrogeno.clientes) || [];
+  var b = nombreBase_(nombre);
+  for (var i = 0; i < lista.length; i++) if (nombreBase_(lista[i].cliente) === b) return lista[i];
+  var igual = nombreParecido_(nombre, lista.map(function (c) { return c.cliente; }));
+  return igual ? lista.filter(function (c) { return c.cliente === igual; })[0] : null;
+}
+
+function filaN2Cliente(c, alTocar, titulo) {
+  var f = el('button', 'fila');
+  var mm = el('div', 'm');
+  mm.appendChild(el('div', 't', titulo || c.cliente));
+  var s = el('div', 's');
+  s.appendChild(el('span', null, textoN2(c)));
+  var ch = chipN2(c); if (ch) s.appendChild(ch);
+  mm.appendChild(s); f.appendChild(mm);
+  f.onclick = alTocar || function () { hojaClienteN2(c); };
+  return f;
+}
+
+/** En Inventario: los clientes a los que ya les toca (o les va a tocar). */
+function tarjetaN2Clientes() {
+  var nz = D.nitrogeno || {}, lista = nz.clientes || [];
+  var card = el('div', 'card');
+  var hd = el('div', 'hdr');
+  hd.appendChild(el('h3', null, 'Nitrógeno de clientes'));
+  var toca = lista.filter(function (c) { return c.estado === 'vencido'; }).length;
+  if (toca) hd.appendChild(el('span', 'chip rojo', toca + (toca === 1 ? ' le toca' : ' les toca')));
+  card.appendChild(hd);
+
+  var urgentes = lista.filter(function (c) { return c.estado === 'vencido' || c.estado === 'pronto'; });
+  if (!lista.length) {
+    card.appendChild(el('div', 'vacio', 'Todavía no hay cargas a clientes. Se anotan solas con las ventas que llevan nitrógeno.'));
+  } else if (!urgentes.length) {
+    card.appendChild(el('div', 'vacio', nz.plazoClientes
+      ? 'A ningún cliente le toca todavía (aviso a los ' + nz.plazoClientes + ' días).'
+      : 'Sin aviso de días: mira la lista para ver hace cuánto se cargó cada uno.'));
+  }
+  urgentes.slice(0, 5).forEach(function (c) { card.appendChild(filaN2Cliente(c)); });
+
+  if (lista.length) {
+    var todos = el('button', 'accion', 'Ver los ' + lista.length + (lista.length === 1 ? ' cliente' : ' clientes') + ' · hace cuánto se cargó cada uno');
+    todos.onclick = function () { hojaN2Todos(); };
+    card.appendChild(todos);
+  }
+  var add = el('button', 'accion', '+  Anotar carga a un cliente');
+  add.onclick = function () { hojaCargaCliente(''); };
+  card.appendChild(add);
+  return card;
+}
+
+function hojaN2Todos() {
+  var nz = D.nitrogeno || {}, lista = nz.clientes || [], h = hoja();
+  h.sh.appendChild(el('h2', null, 'Nitrógeno de clientes'));
+  var sub = el('p', 'sub', '');
+  sub.textContent = nz.plazoClientes ? 'Te aviso a los ' + nz.plazoClientes + ' días de la última carga. ' : 'Sin aviso de días. ';
+  var cam = el('button', 'enlace', 'Cambiar');
+  cam.onclick = function () { h.close(); hojaPlazoClientes(); };
+  sub.appendChild(cam);
+  h.sh.appendChild(sub);
+
+  var b = el('div', 'buscar');
+  var i = document.createElement('input');
+  i.type = 'search'; i.placeholder = 'Buscar cliente…'; i.autocomplete = 'off';
+  b.appendChild(i); h.sh.appendChild(b);
+  var card = el('div', 'card'); card.style.marginTop = '10px';
+  h.sh.appendChild(card);
+  function pintarLista() {
+    card.innerHTML = '';
+    var qq = normal(i.value);
+    var v = lista.filter(function (c) { return !qq || normal(c.cliente).indexOf(qq) > -1; });
+    if (!v.length) card.appendChild(el('div', 'vacio', 'Ningún cliente con ese nombre.'));
+    v.forEach(function (c) { card.appendChild(filaN2Cliente(c, function () { h.close(); hojaClienteN2(c); })); });
+  }
+  i.oninput = pintarLista;
+  pintarLista();
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cerrar'); can.onclick = h.close;
+  var add = el('button', 'btn pri', '+  Anotar carga');
+  add.onclick = function () { h.close(); hojaCargaCliente(''); };
+  bs.appendChild(can); bs.appendChild(add); h.sh.appendChild(bs);
+}
+
+function hojaClienteN2(c) {
+  var h = hoja(), nz = D.nitrogeno || {};
+  h.sh.appendChild(el('h2', null, c.cliente));
+  var est = el('div', 's');
+  est.style.cssText = 'display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-bottom:12px';
+  est.appendChild(el('span', null, 'Última carga ' + c.ultima));
+  est.appendChild(el('span', null, textoN2(c)));
+  var ch = chipN2(c); if (ch) est.appendChild(ch);
+  h.sh.appendChild(est);
+  if (c.promedio) h.sh.appendChild(el('p', 'sub2', 'Suele cargar cada ' + c.promedio + ' días (' + c.veces + ' cargas anotadas).'));
+
+  if (c.historial && c.historial.length) {
+    h.sh.appendChild(el('p', 'rot', 'Cargas'));
+    c.historial.forEach(function (x) {
+      var r = el('div', 'par');
+      r.appendChild(el('span', null, x.fecha + (x.obs ? ' · ' + x.obs : '')));
+      r.appendChild(el('b', 'tnum', litrosTxt(x.litros)));
+      h.sh.appendChild(r);
+    });
+  }
+
+  var bw = el('button', 'btn wa', 'Recordarle la recarga por WhatsApp');
+  bw.style.width = '100%'; bw.style.marginTop = '16px';
+  bw.onclick = function () {
+    if (c.telefono) { abrirWA(c.telefono, textoAvisoN2(c)); return; }
+    h.close();
+    pedirTelefono({ cliente: c.cliente, telefono: '' }, function (tel) { c.telefono = tel; abrirWA(tel, textoAvisoN2(c)); });
+  };
+  h.sh.appendChild(bw);
+  var nueva = el('button', 'btn sec', '+  Anotar carga de este cliente');
+  nueva.style.width = '100%'; nueva.style.marginTop = '9px';
+  nueva.onclick = function () { h.close(); hojaCargaCliente(c.cliente); };
+  h.sh.appendChild(nueva);
+
+  var f = el('div', 'f'); f.style.marginTop = '18px';
+  var general = nz.plazoClientes ? nz.plazoClientes + ' días' : 'sin aviso';
+  f.innerHTML = '<label for="n-cada-cli">Cada cuántos días le toca a este cliente</label>' +
+    '<input id="n-cada-cli" type="number" inputmode="numeric" min="0" placeholder="Como todos: ' + escHtml(general) + '">' +
+    '<p class="hint">Vacío: el mismo de todos los clientes (' + escHtml(general) + '). Cámbialo si su termo dura más o menos.</p>';
+  h.sh.appendChild(f);
+  $('#n-cada-cli', h.sh).value = c.propio || '';
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cerrar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar plazo');
+  ok.onclick = function () {
+    var v = $('#n-cada-cli', h.sh).value.trim();
+    var dias = v === '' ? 0 : Number(v);
+    if (!(dias >= 0)) { toast('Escribe un número de días'); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        D.nitrogeno = r; h.close();
+        toast(dias ? c.cliente + ': cada ' + dias + ' días' : c.cliente + ': como todos los clientes'); pintar();
+      })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar plazo'; toast(String(e && e.message ? e.message : e)); })
+      .guardarPlazoCliente(c.cliente, dias);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
+function abrirWA(tel, texto) {
+  tel = String(tel || '').replace(/\D/g, '');
+  window.open('https://wa.me/' + (tel.length === 10 ? '57' + tel : tel) + '?text=' + encodeURIComponent(texto), '_blank');
+}
+function textoAvisoN2(c) {
+  var saludo = c.destinatario ? 'Buen día, ' + c.destinatario : 'Buen día';
+  var cuando = c.dias === 0 ? 'hoy' : c.dias === 1 ? 'ayer' : 'hace ' + c.dias + ' días';
+  return saludo + '. Le escribimos de Genebov – Genética Bovina.\n\n' +
+    'La última carga de nitrógeno de su termo fue ' + cuando + ' (' + c.ultima + ', ' + litrosTxt(c.litros) + '). ' +
+    '¿Le programamos la recarga?\n\nQuedamos atentos. Gracias.';
+}
+
+function hojaCargaCliente(cliente) {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, 'Nitrógeno a un cliente'));
+  h.sh.appendChild(el('p', 'sub', 'Para cuando le cargas el termo sin factura. Las ventas que llevan nitrógeno se anotan solas.'));
+  var f = el('div');
+  f.innerHTML =
+    '<div class="f"><label for="nc-cli">Cliente</label><input id="nc-cli" type="text" list="nc-clientes" autocomplete="off">' +
+      '<datalist id="nc-clientes"></datalist><p class="hint" id="nc-hint" hidden></p></div>' +
+    '<div class="f2">' +
+      '<div class="f"><label for="nc-fecha">Fecha</label><input id="nc-fecha" type="date"></div>' +
+      '<div class="f"><label for="nc-lit">Litros</label><input id="nc-lit" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0"></div>' +
+    '</div>';
+  h.sh.appendChild(f);
+
+  var nombres = [], vistos = {};
+  D.cartera.clientes.map(function (c) { return c.cliente; })
+    .concat(((D.nitrogeno || {}).clientes || []).map(function (c) { return c.cliente; }))
+    .forEach(function (n) { var b = nombreBase_(n); if (b && !vistos[b]) { vistos[b] = 1; nombres.push(String(n).trim()); } });
+  var dl = $('#nc-clientes', h.sh);
+  nombres.forEach(function (n) { var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+  var campo = $('#nc-cli', h.sh), aviso = $('#nc-hint', h.sh);
+  campo.value = cliente || '';
+  $('#nc-fecha', h.sh).value = hoyISO();
+  campo.onchange = function () {
+    var escrito = campo.value.trim(), igual = escrito ? nombreParecido_(escrito, nombres) : '';
+    if (igual && igual !== escrito) { campo.value = igual; aviso.textContent = 'Escribiste «' + escrito + '»: lo dejé como ' + igual + '.'; }
+    else if (escrito && !igual) aviso.textContent = 'No lo encuentro entre tus clientes: va a quedar como nuevo.';
+    else aviso.textContent = '';
+    aviso.hidden = !aviso.textContent;
+  };
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var d = { cliente: campo.value.trim(), fecha: $('#nc-fecha', h.sh).value, litros: Number($('#nc-lit', h.sh).value) };
+    if (!d.cliente) { toast('Escribe el cliente'); campo.focus(); return; }
+    if (!(d.litros > 0)) { toast('Escribe cuántos litros se le cargaron'); $('#nc-lit', h.sh).focus(); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) { D.nitrogeno = r; h.close(); toast('Carga anotada: ' + d.cliente + ' · ' + litrosTxt(d.litros)); pintar(); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e && e.message ? e.message : e)); })
+      .registrarN2Cliente(d);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+  if (cliente) $('#nc-lit', h.sh).focus(); else campo.focus();
+}
+
+function hojaPlazoClientes() {
+  var h = hoja(), nz = D.nitrogeno || {};
+  h.sh.appendChild(el('h2', null, 'Aviso de nitrógeno'));
+  h.sh.appendChild(el('p', 'sub', 'Para todos los clientes. A uno en particular le puedes poner otro desde su ficha.'));
+  var f = el('div', 'f');
+  f.innerHTML = '<label for="n-cada-todos">A los cuántos días de la última carga te aviso</label>' +
+    '<input id="n-cada-todos" type="number" inputmode="numeric" min="0" placeholder="Sin aviso">' +
+    '<p class="hint">Se pone en naranja unos días antes y en rojo cuando ya le toca. Vacío: sin aviso.</p>';
+  h.sh.appendChild(f);
+  $('#n-cada-todos', h.sh).value = nz.plazoClientes || '';
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Guardar');
+  ok.onclick = function () {
+    var v = $('#n-cada-todos', h.sh).value.trim();
+    var dias = v === '' ? 0 : Number(v);
+    if (!(dias >= 0)) { toast('Escribe un número de días'); return; }
+    ok.disabled = true; ok.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (r) { D.nitrogeno = r; h.close(); toast(dias ? 'Aviso a los ' + dias + ' días' : 'Sin aviso de días'); pintar(); })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e && e.message ? e.message : e)); })
+      .guardarPlazoCliente('', dias);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+}
+
 /* ---------------- INVENTARIO ---------------- */
 function vistaInventario(m) {
   var inv = D.inventario;
@@ -860,6 +1114,7 @@ function vistaInventario(m) {
   dos.appendChild(be); dos.appendChild(bt);
   m.appendChild(dos);
   m.appendChild(tarjetaNitrogeno());
+  m.appendChild(tarjetaN2Clientes());
 
   var cont = el('div');
   cont.style.display = 'flex'; cont.style.flexDirection = 'column'; cont.style.gap = '14px';
@@ -905,7 +1160,7 @@ function listaInventario(cont) {
   inv.movimientos.slice(0, 15).forEach(function (mv) {
     var f = el('div', 'fila');
     var mm = el('div', 'm');
-    mm.appendChild(el('div', 't', mv.toro + '  ·  ' + mv.cantidad));
+    mm.appendChild(el('div', 't', mv.toro + '  ·  ' + (/^nitr/i.test(normal(mv.toro)) ? litrosTxt(mv.cantidad) : mv.cantidad)));
     var s = el('div', 's');
     s.appendChild(el('span', 'chip ' + (mv.tipo === 'Salida' ? 'rojo' : mv.tipo === 'Entrada' ? 'ok' : 'gris'), mv.tipo));
     s.appendChild(el('span', null, mv.fecha));
@@ -942,10 +1197,13 @@ function hojaVenta() {
       '<datalist id="v-clientes"></datalist><p class="hint" id="v-cli-hint" hidden></p></div>' +
     '<div class="f"><label for="v-total">Total de la factura</label><input id="v-total" type="number" inputmode="numeric" placeholder="0"></div>' +
     '<label class="check"><input type="checkbox" id="v-canc"><span>La factura dice <b>CANCELADO</b>: ya está pagada. ' +
-      'No va a cartera, solo descuenta las pajillas.</span></label>' +
+      'No va a cartera: solo descuenta las pajillas y anota el nitrógeno.</span></label>' +
     '<div class="f"><label>Pajillas que salen</label><div class="lista" id="v-items"></div>' +
       '<button class="subir" id="v-add" style="padding:10px; margin-top:8px">+  Agregar toro</button>' +
-      '<p class="hint">Salen del termo de transporte. Si la venta fue solo de nitrógeno, déjalo vacío.</p></div>';
+      '<p class="hint">Salen del termo de transporte. Si la venta fue solo de nitrógeno, déjalo vacío.</p></div>' +
+    '<div class="f"><label for="v-n2">Nitrógeno líquido (litros)</label>' +
+      '<input id="v-n2" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0">' +
+      '<p class="hint" id="v-n2-hint">Lo que se le cargó al termo del cliente. Así sabes hace cuánto se le cargó.</p></div>';
   h.sh.appendChild(campos);
 
   var dl = $('#v-clientes', h.sh);
@@ -1054,8 +1312,20 @@ function hojaVenta() {
             if (d.factura) $('#v-fac', h.sh).value = d.factura;
             if (d.cliente && !$('#v-cli', h.sh).value) { $('#v-cli', h.sh).value = d.cliente; ajustarCliente(true); }
             $('#v-canc', h.sh).checked = !!d.cancelada;
-            var iso = fechaISO(d.fecha);
-            if (iso) $('#v-fecha', h.sh).value = iso;
+            var iso = fechaISO(d.fecha), notaFecha = '';
+            if (iso) {
+              var cr = fechaCreible(iso);
+              if (cr !== iso) notaFecha = ' Ojo con la fecha: leí ' + fechaBonita(iso) + ' y la dejé en ' + fechaBonita(cr) + '.';
+              $('#v-fecha', h.sh).value = cr;
+            }
+            var hn = $('#v-n2-hint', h.sh);
+            if (d.nitrogeno > 0) {
+              $('#v-n2', h.sh).value = d.nitrogeno;
+              hn.textContent = 'Leí ' + litrosTxt(d.nitrogeno) + ' de nitrógeno en la factura' +
+                               (d.nitrogenoValor ? ' (' + plata(d.nitrogenoValor) + ')' : '') + '. Revísalo.';
+            } else if (d.nitrogenoValor > 0) {
+              hn.textContent = 'La factura cobra nitrógeno (' + plata(d.nitrogenoValor) + ') pero no veo los litros: escríbelos.';
+            }
             var n = 0;
             if (d.items && d.items.length) {
               items = d.items.map(function (x) {
@@ -1064,9 +1334,12 @@ function hojaVenta() {
               n = items.length;
               pintarItems();
             }
-            est.textContent = 'Leí la factura' + (n ? ' y ' + n + (n === 1 ? ' línea de pajillas' : ' líneas de pajillas') : '') +
+            var leido = [];
+            if (n) leido.push(n + (n === 1 ? ' línea de pajillas' : ' líneas de pajillas'));
+            if (d.nitrogeno > 0) leido.push(litrosTxt(d.nitrogeno) + ' de nitrógeno');
+            est.textContent = 'Leí la factura' + (leido.length ? ': ' + leido.join(' y ') : '') +
                               (d.cancelada ? '. Dice CANCELADO, así que no va a cartera' : '') +
-                              '. Revisa los datos antes de guardar.';
+                              '. Revisa los datos antes de guardar.' + notaFecha;
           } else if (d && d.motivo === 'sin_clave') {
             est.textContent = 'Escribe el total a mano (falta configurar la clave de Gemini).';
           } else {
@@ -1088,8 +1361,10 @@ function hojaVenta() {
     var cli = $('#v-cli', h.sh).value.trim();
     var tot = Number($('#v-total', h.sh).value);
     var canc = $('#v-canc', h.sh).checked;
+    var n2 = Number($('#v-n2', h.sh).value) || 0;
     if (!cli) { toast('Falta el cliente'); return; }
-    if (!(tot > 0) && !items.length) { toast('Falta el total o las pajillas'); return; }
+    if (n2 < 0) { toast('Los litros de nitrógeno no pueden ser negativos'); return; }
+    if (!(tot > 0) && !items.length && !(n2 > 0)) { toast('Falta el total, las pajillas o el nitrógeno'); return; }
     // Una línea sin toro o sin cantidad no se puede guardar: antes se descartaba
     // en silencio y esas pajillas nunca salían del inventario.
     var sinToro = items.filter(function (x) { return !x.toro && (Number(x.cantidad) > 0 || x.leido); });
@@ -1101,13 +1376,13 @@ function hojaVenta() {
     var sinCant = items.filter(function (x) { return x.toro && !(Number(x.cantidad) > 0); });
     if (sinCant.length) { toast('Falta la cantidad de ' + sinCant[0].toro); return; }
     var conPajillas = items.some(function (x) { return x.toro && Number(x.cantidad) > 0; });
-    if (canc && !conPajillas) {
-      toast('Una factura cancelada solo descuenta pajillas: agrega el toro que salió'); return;
+    if (canc && !conPajillas && !(n2 > 0)) {
+      toast('Una factura cancelada no va a cartera: agrega el toro o los litros de nitrógeno que salieron'); return;
     }
-    if (!conPajillas && !sinPajillasOk) {
+    if (!conPajillas && !(n2 > 0) && !sinPajillasOk) {
       sinPajillasOk = true;
       ok.textContent = 'Sin pajillas · toca otra vez';
-      toast('Esta venta no descuenta pajillas. Si fue solo nitrógeno, toca Guardar otra vez; si no, agrega el toro.');
+      toast('Esta venta no descuenta pajillas ni anota nitrógeno. Si es así, toca Guardar otra vez; si no, agrega el toro o los litros.');
       return;
     }
     ok.disabled = true; ok.textContent = 'Guardando…';
@@ -1115,7 +1390,8 @@ function hojaVenta() {
       .withSuccessHandler(function (r) {
         h.close();
         toast((r.cartera === false ? 'Venta cancelada registrada (no va a cartera)' : 'Venta registrada') +
-              (r.movimientos ? ' · ' + r.movimientos + (r.movimientos === 1 ? ' salida' : ' salidas') : ''));
+              (r.movimientos ? ' · ' + r.movimientos + (r.movimientos === 1 ? ' salida' : ' salidas') : '') +
+              (r.nitrogeno ? ' · nitrógeno ' + litrosTxt(r.nitrogeno) : ''));
         cargar(true);
       })
       .withFailureHandler(function (e) {
@@ -1123,7 +1399,7 @@ function hojaVenta() {
       })
       .registrarVenta({
         fecha: $('#v-fecha', h.sh).value, cliente: cli, factura: $('#v-fac', h.sh).value.trim(),
-        total: tot, items: items, foto: foto, cancelada: canc
+        total: tot, items: items, foto: foto, cancelada: canc, nitrogeno: n2
       });
   };
   bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
