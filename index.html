@@ -178,6 +178,8 @@ main{padding-block:16px 24px; display:flex; flex-direction:column; gap:14px}
 .card.pad .go .btn{flex:1}
 .aviso{background:var(--warn-soft); color:var(--warn); border-radius:9px; padding:10px 12px;
        font-size:12.5px; line-height:1.45; margin-top:11px}
+.check{display:flex; gap:10px; align-items:flex-start; margin:2px 0 4px; font-size:14px; line-height:1.4; color:var(--body); cursor:pointer}
+.check input{width:20px; height:20px; margin:1px 0 0; flex:none; accent-color:var(--red)}
 .compartir{width:100%; display:flex; align-items:center; justify-content:center; gap:8px; margin:2px 0 16px}
 .compartir svg{width:18px; height:18px; flex:none}
 .enlace{display:flex; align-items:center; gap:8px; margin-top:13px; color:var(--muted);
@@ -253,7 +255,7 @@ try { TOKEN = localStorage.getItem('genebov_token') || ''; } catch (e) {}
 var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEstadoCuenta',
   'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
   'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
-  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro'];
+  'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro','ordenarCartera'];
 
 function pedir(accion, args) {
   if (!API) {
@@ -383,6 +385,56 @@ var TERMO_VENTA = 'Termo transporte pajillas';   // de aquí salen las ventas; i
 function escHtml(t) {
   return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ---- nombres de clientes ----
+   Mismo cliente aunque cambie el título (Dr., Dra., Ing.), las mayúsculas, las
+   tildes o una letra mal leída. Se usa igual en el servidor y en la app. */
+function nombreBase_(s) {
+  var t = String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[.,;:]/g, ' ').replace(/\s+/g, ' ').trim();
+  var antes;
+  do { antes = t; t = t.replace(/^(dr|dra|doctor|doctora|ing|ingeniero|ingeniera)\s+/, ''); } while (t !== antes);
+  return t;
+}
+
+function distancia_(a, b) {
+  if (a === b) return 0;
+  var m = a.length, n = b.length, prev = [], cur, i, j;
+  for (j = 0; j <= n; j++) prev[j] = j;
+  for (i = 1; i <= m; i++) {
+    cur = [i];
+    for (j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/** El nombre de la lista que es el mismo cliente, o '' si no hay uno claro.
+ *  Si hay dos posibles (p. ej. dos Franciscos), no adivina. */
+function nombreParecido_(nombre, lista) {
+  var limpio = function (x) { return String(x || '').trim().toLowerCase().replace(/\s+/g, ' '); };
+  var b = nombreBase_(nombre), exacto = limpio(nombre), i;
+  if (!b) return '';
+  for (i = 0; i < lista.length; i++) if (limpio(lista[i]) === exacto) return lista[i];
+  for (i = 0; i < lista.length; i++) if (nombreBase_(lista[i]) === b) return lista[i];
+
+  var grupos = {}, orden = [];
+  lista.forEach(function (x) {
+    var c = nombreBase_(x);
+    if (!c || grupos[c]) return;
+    var d = distancia_(b, c), corto = Math.min(b.length, c.length);
+    var ok = (d === 1 && corto >= 5) || (d === 2 && corto >= 10);
+    if (!ok) {
+      var pa = b.split(' '), pc = c.split(' ');
+      var pocas = pa.length <= pc.length ? pa : pc, muchas = pocas === pa ? pc : pa;
+      ok = pocas.length >= 2 && pocas.every(function (w) { return muchas.indexOf(w) >= 0; });
+    }
+    if (ok) { grupos[c] = x; orden.push(c); }
+  });
+  return orden.length === 1 ? grupos[orden[0]] : '';
 }
 
 /* ---------------- foto de la factura ---------------- */
@@ -637,9 +689,13 @@ function hojaAbono(x, f) {
     if (!(v > 0)) { toast('Escribe el valor del abono'); i.focus(); return; }
     ok.disabled = true; ok.textContent = 'Guardando…';
     google.script.run
-      .withSuccessHandler(function () { h.close(); toast('Abono registrado'); cargar(true); })
+      .withSuccessHandler(function (r) {
+        h.close();
+        toast(r && r.pagada ? 'Factura pagada' + (r.quitada ? ': la quité de la cartera' : ': quedó en cero') : 'Abono registrado');
+        cargar(true);
+      })
       .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Guardar'; toast(String(e.message || e)); })
-      .registrarAbono(f.fila, v);
+      .registrarAbono(f.fila, v, { cliente: x.cliente, numero: f.numero, valor: f.valor });
   };
   bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
   i.focus();
@@ -744,8 +800,10 @@ function hojaVenta() {
       '<div class="f"><label for="v-fecha">Fecha</label><input id="v-fecha" type="date"></div>' +
     '</div>' +
     '<div class="f"><label for="v-cli">Cliente</label><input id="v-cli" type="text" list="v-clientes" autocomplete="off">' +
-      '<datalist id="v-clientes"></datalist></div>' +
+      '<datalist id="v-clientes"></datalist><p class="hint" id="v-cli-hint" hidden></p></div>' +
     '<div class="f"><label for="v-total">Total de la factura</label><input id="v-total" type="number" inputmode="numeric" placeholder="0"></div>' +
+    '<label class="check"><input type="checkbox" id="v-canc"><span>La factura dice <b>CANCELADO</b>: ya está pagada. ' +
+      'No va a cartera, solo descuenta las pajillas.</span></label>' +
     '<div class="f"><label>Pajillas que salen</label><div class="lista" id="v-items"></div>' +
       '<button class="subir" id="v-add" style="padding:10px; margin-top:8px">+  Agregar toro</button>' +
       '<p class="hint">Salen del termo de transporte. Si la venta fue solo de nitrógeno, déjalo vacío.</p></div>';
@@ -756,6 +814,26 @@ function hojaVenta() {
     var o = document.createElement('option'); o.value = c.cliente; dl.appendChild(o);
   });
   $('#v-fecha', h.sh).value = new Date().toISOString().slice(0, 10);
+
+  // el cliente, como ya está en la cartera: "Francisco Valenzuela" es "Dr. Francisco valenzuela"
+  function ajustarCliente(deLaFactura) {
+    var campo = $('#v-cli', h.sh), aviso = $('#v-cli-hint', h.sh);
+    var escrito = campo.value.trim();
+    var lista = D.cartera.clientes.map(function (c) { return c.cliente; });
+    var igual = escrito ? nombreParecido_(escrito, lista) : '';
+    if (igual && igual.trim() !== escrito) {
+      campo.value = igual.trim();
+      aviso.textContent = (deLaFactura ? 'En la factura dice «' : 'Escribiste «') + escrito +
+                          '»: lo dejé como ' + igual.trim() + ', que ya está en tu cartera.';
+    } else if (escrito && !igual) {
+      aviso.textContent = 'No lo encuentro en tu cartera: va a quedar como cliente nuevo. ' +
+                          'Si ya existe, escoge su nombre de la lista.';
+    } else {
+      aviso.textContent = '';
+    }
+    aviso.hidden = !aviso.textContent;
+  }
+  $('#v-cli', h.sh).onchange = function () { ajustarCliente(false); };
 
   // las ventas salen del termo de transporte: solo se ofrece lo que hay ahí, con su canastilla
   var disp = (inv.existencias || []).filter(function (e) {
@@ -832,7 +910,8 @@ function hojaVenta() {
           if (d && d.ok) {
             if (d.total) $('#v-total', h.sh).value = d.total;
             if (d.factura) $('#v-fac', h.sh).value = d.factura;
-            if (d.cliente && !$('#v-cli', h.sh).value) $('#v-cli', h.sh).value = d.cliente;
+            if (d.cliente && !$('#v-cli', h.sh).value) { $('#v-cli', h.sh).value = d.cliente; ajustarCliente(true); }
+            $('#v-canc', h.sh).checked = !!d.cancelada;
             var iso = fechaISO(d.fecha);
             if (iso) $('#v-fecha', h.sh).value = iso;
             var n = 0;
@@ -844,6 +923,7 @@ function hojaVenta() {
               pintarItems();
             }
             est.textContent = 'Leí la factura' + (n ? ' y ' + n + (n === 1 ? ' línea de pajillas' : ' líneas de pajillas') : '') +
+                              (d.cancelada ? '. Dice CANCELADO, así que no va a cartera' : '') +
                               '. Revisa los datos antes de guardar.';
           } else if (d && d.motivo === 'sin_clave') {
             est.textContent = 'Escribe el total a mano (falta configurar la clave de Gemini).';
@@ -865,13 +945,18 @@ function hojaVenta() {
   ok.onclick = function () {
     var cli = $('#v-cli', h.sh).value.trim();
     var tot = Number($('#v-total', h.sh).value);
+    var canc = $('#v-canc', h.sh).checked;
     if (!cli) { toast('Falta el cliente'); return; }
     if (!(tot > 0) && !items.length) { toast('Falta el total o las pajillas'); return; }
+    if (canc && !items.some(function (x) { return x.toro && Number(x.cantidad) > 0; })) {
+      toast('Una factura cancelada solo descuenta pajillas: agrega el toro que salió'); return;
+    }
     ok.disabled = true; ok.textContent = 'Guardando…';
     google.script.run
       .withSuccessHandler(function (r) {
         h.close();
-        toast('Venta registrada' + (r.movimientos ? ' · ' + r.movimientos + ' salidas' : ''));
+        toast((r.cartera === false ? 'Venta cancelada registrada (no va a cartera)' : 'Venta registrada') +
+              (r.movimientos ? ' · ' + r.movimientos + (r.movimientos === 1 ? ' salida' : ' salidas') : ''));
         cargar(true);
       })
       .withFailureHandler(function (e) {
@@ -879,7 +964,7 @@ function hojaVenta() {
       })
       .registrarVenta({
         fecha: $('#v-fecha', h.sh).value, cliente: cli, factura: $('#v-fac', h.sh).value.trim(),
-        total: tot, items: items, foto: foto
+        total: tot, items: items, foto: foto, cancelada: canc
       });
   };
   bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
@@ -1652,6 +1737,24 @@ function vistaAjustes(m) {
   b.style.width = '100%'; b.style.marginTop = '12px';
   b.onclick = function () { cargar(); };
   c3.appendChild(b);
+  var bo = el('button', 'btn sec', 'Ordenar la cartera de la A a la Z');
+  bo.style.width = '100%'; bo.style.marginTop = '8px';
+  bo.onclick = function () {
+    bo.disabled = true; bo.textContent = 'Ordenando…';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        bo.disabled = false; bo.textContent = 'Ordenar la cartera de la A a la Z';
+        toast(r.movidas ? 'Listo: moví ' + r.movidas + (r.movidas === 1 ? ' fila' : ' filas') : 'Ya estaba en orden');
+        cargar(true);
+      })
+      .withFailureHandler(function (e) {
+        bo.disabled = false; bo.textContent = 'Ordenar la cartera de la A a la Z'; toast(String(e.message || e));
+      })
+      .ordenarCartera();
+  };
+  c3.appendChild(bo);
+  c3.appendChild(el('p', 'hint', 'Por nombre, sin contar el Dr. o el Ing.; cada cliente con sus facturas por fecha. ' +
+                                 'Las facturas nuevas ya entran en su lugar; esto es por si editas la hoja a mano.'));
   m.appendChild(c3);
 
   // fichas que todavía no están en Drive
