@@ -257,7 +257,7 @@ var ACCIONES = ['apiTodo','apiCartera','apiInventario','apiCatalogo','mensajeEst
   'registrarAbono','guardarTelefono','leerFactura','registrarVenta','registrarMovimiento',
   'guardarRaza','borrarRaza','guardarToro','borrarToro','guardarFichas','subirFicha',
   'guardarConfig','guardarTema','importarFichasZip','generarLista','archivosToro','ordenarCartera','apiNitrogeno','registrarCarga','guardarPlazo',
-  'registrarN2Cliente','guardarPlazoCliente'];
+  'registrarN2Cliente','guardarPlazoCliente','agregarTermo','quitarTermo'];
 
 function pedir(accion, args) {
   if (!API) {
@@ -776,7 +776,54 @@ function tarjetaNitrogeno() {
   var add = el('button', 'accion', '+  Registrar carga de nitrógeno');
   add.onclick = function () { hojaCarga(''); };
   card.appendChild(add);
+  var nuevo = el('button', 'accion', '+  Agregar un termo');
+  nuevo.onclick = function () { hojaAgregarTermo(); };
+  card.appendChild(nuevo);
   return card;
+}
+
+function pajillasEn(termo) {
+  return ((D.inventario || {}).existencias || []).reduce(function (s, e) {
+    return s + (e.termo === termo && e.cantidad > 0 ? e.cantidad : 0);
+  }, 0);
+}
+
+function hojaAgregarTermo() {
+  var h = hoja();
+  h.sh.appendChild(el('h2', null, 'Agregar un termo'));
+  h.sh.appendChild(el('p', 'sub', 'Queda en la lista de termos: lo ves aquí, en Entrada y en Traslado.'));
+  var f = el('div');
+  f.innerHTML =
+    '<div class="f"><label for="tn-nom">Nombre del termo</label>' +
+      '<input id="tn-nom" type="text" autocomplete="off" placeholder="Ej: Termo 5"></div>' +
+    '<div class="f"><label for="tn-cada">Cada cuántos días se carga</label>' +
+      '<input id="tn-cada" type="number" inputmode="numeric" min="0" placeholder="Sin aviso">' +
+      '<p class="hint">Si lo van a dejar quieto, déjalo vacío y no te avisa. Lo puedes cambiar después.</p></div>';
+  h.sh.appendChild(f);
+
+  var bs = el('div', 'btns');
+  var can = el('button', 'btn sec', 'Cancelar'); can.onclick = h.close;
+  var ok = el('button', 'btn pri', 'Agregar');
+  ok.onclick = function () {
+    var nom = $('#tn-nom', h.sh).value.trim().replace(/\s+/g, ' ');
+    var v = $('#tn-cada', h.sh).value.trim(), dias = v === '' ? 0 : Number(v);
+    if (!nom) { toast('Escribe el nombre del termo'); $('#tn-nom', h.sh).focus(); return; }
+    if (!(dias >= 0)) { toast('Escribe un número de días'); return; }
+    var ya = ((D.nitrogeno || {}).termos || []).some(function (t) { return normal(t.termo) === normal(nom); });
+    if (ya) { toast('Ya hay un termo que se llama así'); return; }
+    ok.disabled = true; ok.textContent = 'Agregando…';
+    google.script.run
+      .withSuccessHandler(function (r) {
+        D.nitrogeno = r;
+        var l = D.inventario.listas.termos;
+        if (l.indexOf(nom) < 0) l.push(nom);
+        h.close(); toast('Termo agregado: ' + nom); pintar();
+      })
+      .withFailureHandler(function (e) { ok.disabled = false; ok.textContent = 'Agregar'; toast(String(e && e.message ? e.message : e)); })
+      .agregarTermo(nom, dias);
+  };
+  bs.appendChild(can); bs.appendChild(ok); h.sh.appendChild(bs);
+  $('#tn-nom', h.sh).focus();
 }
 
 function hojaCarga(termo) {
@@ -817,7 +864,8 @@ function hojaCarga(termo) {
 function hojaTermoN2(t) {
   var h = hoja();
   h.sh.appendChild(el('h2', null, t.termo));
-  var est = el('div', 's'); est.style.marginBottom = '12px';
+  var est = el('div', 's');
+  est.style.cssText = 'display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-bottom:12px';
   var txt = textoN2(t);
   est.appendChild(el('span', null, txt ? 'Última carga: ' + t.ultima + ' · ' + txt : 'Todavía no tiene cargas anotadas.'));
   var c = chipN2(t); if (c) est.appendChild(c);
@@ -844,6 +892,37 @@ function hojaTermoN2(t) {
   nueva.style.width = '100%'; nueva.style.marginTop = '14px';
   nueva.onclick = function () { h.close(); hojaCarga(t.termo); };
   h.sh.appendChild(nueva);
+
+  if (t.termo !== TERMO_VENTA) {
+    var pj = pajillasEn(t.termo);
+    var quitar = el('button', 'btn sec', 'Quitar este termo');
+    quitar.style.cssText = 'width:100%; margin-top:9px; color:var(--red)';
+    var listo = false;
+    quitar.onclick = function () {
+      if (pj > 0) {
+        toast('Tiene ' + pj + ' pajillas: pásalas a otro termo con un traslado y después lo quitas'); return;
+      }
+      if (!listo) { listo = true; quitar.textContent = 'Toca otra vez para quitarlo'; return; }
+      quitar.disabled = true; quitar.textContent = 'Quitando…';
+      google.script.run
+        .withSuccessHandler(function (r) {
+          D.nitrogeno = r;
+          D.inventario.listas.termos = D.inventario.listas.termos.filter(function (x) { return x !== t.termo; });
+          h.close(); toast('Quité ' + t.termo); pintar();
+        })
+        .withFailureHandler(function (e) {
+          quitar.disabled = false; listo = false; quitar.textContent = 'Quitar este termo';
+          toast(String(e && e.message ? e.message : e));
+        })
+        .quitarTermo(t.termo);
+    };
+    h.sh.appendChild(quitar);
+    var nota = el('p', 'sub2', pj > 0
+      ? 'Tiene ' + pj + ' pajillas. Para quitarlo, primero pásalas a otro termo.'
+      : 'Está vacío: si ya no lo usan, lo puedes quitar. Lo anotado antes no se borra.');
+    nota.style.margin = '8px 2px 0';
+    h.sh.appendChild(nota);
+  }
 
   var bs = el('div', 'btns');
   var can = el('button', 'btn sec', 'Cerrar'); can.onclick = h.close;
