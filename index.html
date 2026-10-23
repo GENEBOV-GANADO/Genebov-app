@@ -848,7 +848,10 @@ function hojaVenta() {
     return null;
   }
 
+  var sinPajillasOk = false;     // segundo toque para guardar una venta sin pajillas (solo nitrógeno)
   function pintarItems() {
+    sinPajillasOk = false;
+    if (ok) ok.textContent = 'Guardar la venta';
     var cont = $('#v-items', h.sh); cont.innerHTML = '';
     items.forEach(function (it, i) {
       var caja = el('div');
@@ -948,8 +951,25 @@ function hojaVenta() {
     var canc = $('#v-canc', h.sh).checked;
     if (!cli) { toast('Falta el cliente'); return; }
     if (!(tot > 0) && !items.length) { toast('Falta el total o las pajillas'); return; }
-    if (canc && !items.some(function (x) { return x.toro && Number(x.cantidad) > 0; })) {
+    // Una línea sin toro o sin cantidad no se puede guardar: antes se descartaba
+    // en silencio y esas pajillas nunca salían del inventario.
+    var sinToro = items.filter(function (x) { return !x.toro && (Number(x.cantidad) > 0 || x.leido); });
+    if (sinToro.length) {
+      toast(sinToro[0].leido ? 'Escoge el toro de «' + sinToro[0].leido + '», o quita esa línea con la X'
+                             : 'Hay una línea de pajillas sin toro: escógelo o quítala con la X');
+      return;
+    }
+    var sinCant = items.filter(function (x) { return x.toro && !(Number(x.cantidad) > 0); });
+    if (sinCant.length) { toast('Falta la cantidad de ' + sinCant[0].toro); return; }
+    var conPajillas = items.some(function (x) { return x.toro && Number(x.cantidad) > 0; });
+    if (canc && !conPajillas) {
       toast('Una factura cancelada solo descuenta pajillas: agrega el toro que salió'); return;
+    }
+    if (!conPajillas && !sinPajillasOk) {
+      sinPajillasOk = true;
+      ok.textContent = 'Sin pajillas · toca otra vez';
+      toast('Esta venta no descuenta pajillas. Si fue solo nitrógeno, toca Guardar otra vez; si no, agrega el toro.');
+      return;
     }
     ok.disabled = true; ok.textContent = 'Guardando…';
     google.script.run

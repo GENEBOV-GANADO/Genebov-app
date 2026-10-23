@@ -1,6 +1,6 @@
 /* Guarda la pantalla en el teléfono para que la app abra sin internet.
    Los datos siempre se piden a Apps Script: eso sí necesita conexión. */
-const CACHE = 'genebov-app-v2';
+const CACHE = 'genebov-app-v3';
 const PANTALLA = [
   './', 'index.html', 'config.js', 'manifest.json', 'logo.png',
   'iconos/icono-192.png', 'iconos/icono-512.png',
