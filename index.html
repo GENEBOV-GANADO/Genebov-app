@@ -1467,6 +1467,15 @@ function hojaVenta() {
     ok.disabled = true; ok.textContent = 'Guardando…';
     google.script.run
       .withSuccessHandler(function (r) {
+        if (r.carteraError) {
+          // las pajillas sí salieron; lo que falló fue la fila de cartera
+          est.textContent = 'Se descontó del inventario, pero no pude ponerla en Cartera: ' + r.carteraError +
+                            '. Escríbela a mano en Cartera y mándame este mensaje.';
+          est.style.color = 'var(--red)';
+          est.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          ok.textContent = 'Listo'; ok.disabled = false; ok.onclick = function () { h.close(); cargar(true); };
+          return;
+        }
         h.close();
         var que = r.completada ? 'Esa factura ya estaba en cartera: ahora se descontó del inventario'
                 : r.cartera === false ? 'Venta cancelada registrada (no va a cartera)' : 'Venta registrada';
