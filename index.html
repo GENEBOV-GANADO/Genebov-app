@@ -1468,13 +1468,19 @@ function hojaVenta() {
     google.script.run
       .withSuccessHandler(function (r) {
         h.close();
-        toast((r.cartera === false ? 'Venta cancelada registrada (no va a cartera)' : 'Venta registrada') +
-              (r.movimientos ? ' · ' + r.movimientos + (r.movimientos === 1 ? ' salida' : ' salidas') : '') +
+        var que = r.completada ? 'Esa factura ya estaba en cartera: ahora se descontó del inventario'
+                : r.cartera === false ? 'Venta cancelada registrada (no va a cartera)' : 'Venta registrada';
+        toast(que + (r.movimientos ? ' · ' + r.movimientos + (r.movimientos === 1 ? ' salida' : ' salidas') : '') +
               (r.nitrogeno ? ' · nitrógeno ' + litrosTxt(r.nitrogeno) : ''));
         cargar(true);
       })
       .withFailureHandler(function (e) {
-        ok.disabled = false; ok.textContent = 'Guardar la venta'; toast(String(e.message || e));
+        // el error se queda escrito en la hoja (un aviso de 3 segundos se pierde)
+        ok.disabled = false; ok.textContent = 'Guardar la venta';
+        var msg = String(e && e.message ? e.message : e);
+        est.textContent = 'No se guardó: ' + msg; est.style.color = 'var(--red)';
+        est.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        toast(msg);
       })
       .registrarVenta({
         fecha: $('#v-fecha', h.sh).value, cliente: cli, factura: $('#v-fac', h.sh).value.trim(),
